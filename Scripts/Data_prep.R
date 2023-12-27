@@ -32,13 +32,40 @@
   
   #'  Load spatial data
   usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
+  hwys <- st_read("./Shapefiles/GEE/PrimaryRoads_AZ_NM.shp") %>% st_transform(wgs84)
+  dem <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico.tif")
+  slope1 <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico-1.tif")
+  slope2 <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico-2.tif")
+  
+  #'  Filter and create new sf objects
+  #'  AZ & NM polygon
   az_nm <- filter(usa, NAME == "Arizona" | NAME == "New Mexico") %>% st_transform(wgs84) 
   st_crs(az_nm); st_bbox(az_nm)
+  #'  Merge into single "southwest" polygon
+  southwest <- st_union(az_nm[az_nm$NAME == "Arizona",], az_nm[az_nm$NAME == "New Mexico",]) %>%
+    st_cast("POLYGON")
+  #'  Create a single LINESTRING for I40
+  I40 <- filter(hwys, fullname == "I- 40") %>%
+    st_union()
+  I10 <- filter(hwys, fullname == "I- 10") %>%
+    st_union()
+  #'  Join highways that boarder experimental population area
+  I40_I10 <- st_union(I40, I10)
+  #'  Split southwest polygon by I40
+  split_southwest <- lwgeom::st_split(southwest, I40_I10) %>%
+    st_collection_extract("POLYGON")
+  split_southwest$include <- factor(seq_len(nrow(split_southwest)))
+  ggplot(split_southwest) + geom_sf(aes(fill = include))
+  #'  Filter to experimental population area and anything south of I40
+  exp_pop <- filter(split_southwest, include == 2); st_crs(exp_pop); st_bbox(exp_pop)
+  southI40 <- filter(split_southwest, include != 1) %>% st_union(); st_crs(southI40); st_bbox(southI40)
+  ggplot(exp_pop) + geom_sf();  ggplot(az_nm) + geom_sf() + geom_sf(data = southI40)
+  
+  #'  Save select features
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.shp")
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.kml", driver = "kml", delete_dsn = TRUE)
-  dem <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico.tif")
-  slope <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico.tif")
-  aspect <- terra::rast("./Shapefiles/GEE/Aspect_Arizona_NewMexico.tif")
+  # st_write(exp_pop, "./Shapefiles/experimental_pop_poly.shp")
+  # st_write(southI40, "./Shapefiles/I40_south_poly.shp")
   
   #'  Create a sf object for locations
   spatial_locs <- function(locs, proj) {
@@ -55,10 +82,10 @@
   plot(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",])  
   
   #'  Save
-  st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Den",], "./Shapefiles/Homesites/homesites_d.kml", driver = "kml", delete_dsn = TRUE)
-  st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Den",], "./Shapefiles/Homesites/homesites_den.shp")
-  st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], "./Shapefiles/Homesites/homesites_r.kml", driver = "kml", delete_dsn = TRUE)
-  st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], "./Shapefiles/Homesites/homesites_rendezvous.shp")
+  # st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Den",], "./Shapefiles/Homesites/homesites_d.kml", driver = "kml", delete_dsn = TRUE)
+  # st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Den",], "./Shapefiles/Homesites/homesites_den.shp")
+  # st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], "./Shapefiles/Homesites/homesites_r.kml", driver = "kml", delete_dsn = TRUE)
+  # st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], "./Shapefiles/Homesites/homesites_rendezvous.shp")
   
   #'  Explore homesites by year, pack, and type (den vs rendezvous)
   
