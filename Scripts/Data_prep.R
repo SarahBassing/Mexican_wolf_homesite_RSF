@@ -49,7 +49,7 @@
     st_union()
   I10 <- filter(hwys, fullname == "I- 10") %>%
     st_union()
-  #'  Join highways that boarder experimental population area
+  #'  Join highways that border experimental population area
   I40_I10 <- st_union(I40, I10)
   #'  Split southwest polygon by I40
   split_southwest <- lwgeom::st_split(southwest, I40_I10) %>%
