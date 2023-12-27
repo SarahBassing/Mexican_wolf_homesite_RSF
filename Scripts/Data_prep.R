@@ -4,9 +4,9 @@
   #'  Sarah B. Bassing
   #'  December 2023
   #'  ------------------------
-  #'  Script to visulaize and explore wolf homesite location data, randomly sample
+  #'  Script to visualize and explore wolf homesite location data, randomly sample
   #'  "available" points and extract covariate data for each "used" and "available"
-  #'  location. Final dataset to be used as input for RSF analyses.
+  #'  location. Final data set to be used as input for RSF analyses.
   #'  ------------------------
   
   #'  Clear memory
@@ -26,6 +26,18 @@
   
   #'  Define projection
   wgs84 <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
+  #' ESRI:102003 USA_Contiguous_Albers_Equal_Area_Conic
+  aea <- st_crs("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs")
+  
+  
+  #'  Load spatial data
+  usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
+  az_nm <- filter(usa, NAME == "Arizona" | NAME == "New Mexico") %>% st_transform(wgs84) 
+  st_crs(az_nm); st_bbox(az_nm)
+  # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.shp")
+  # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.kml", driver = "kml", delete_dsn = TRUE)
+  dem <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico.tif")
+  dem2 <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico-2.tif")
   
   #'  Create a sf object for locations
   spatial_locs <- function(locs, proj) {
