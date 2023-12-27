@@ -37,7 +37,8 @@
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.shp")
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.kml", driver = "kml", delete_dsn = TRUE)
   dem <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico.tif")
-  dem2 <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico-2.tif")
+  slope <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico.tif")
+  aspect <- terra::rast("./Shapefiles/GEE/Aspect_Arizona_NewMexico.tif")
   
   #'  Create a sf object for locations
   spatial_locs <- function(locs, proj) {
@@ -52,6 +53,12 @@
 
   plot(homesites_wgs84[homesites_wgs84$Site_Type == "Den",])  
   plot(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",])  
+  
+  #'  Save
+  st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Den",], "./Shapefiles/Homesites/homesites_d.kml", driver = "kml", delete_dsn = TRUE)
+  st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Den",], "./Shapefiles/Homesites/homesites_den.shp")
+  st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], "./Shapefiles/Homesites/homesites_r.kml", driver = "kml", delete_dsn = TRUE)
+  st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], "./Shapefiles/Homesites/homesites_rendezvous.shp")
   
   #'  Explore homesites by year, pack, and type (den vs rendezvous)
   
