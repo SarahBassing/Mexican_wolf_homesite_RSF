@@ -34,8 +34,8 @@
   usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
   hwys <- st_read("./Shapefiles/GEE/PrimaryRoads_AZ_NM.shp") %>% st_transform(wgs84)
   dem <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico.tif")
-  slope1 <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico-1.tif")
-  slope2 <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico-2.tif")
+  # slope1 <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico-1.tif")
+  # slope2 <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico-2.tif")
   
   #'  Filter and create new sf objects
   #'  AZ & NM polygon
@@ -78,8 +78,12 @@
   }
   homesites_wgs84 <- spatial_locs(homesites, wgs84)
 
-  plot(homesites_wgs84[homesites_wgs84$Site_Type == "Den",])  
-  plot(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",])  
+  ggplot(exp_pop) + geom_sf() + geom_sf(data = hwys) + 
+    geom_sf(data = homesites_wgs84[homesites_wgs84$Site_Type == "Den",], aes(color = Year), shape = 16, size = 3) 
+  ggplot(exp_pop) + geom_sf() + geom_sf(data = hwys) + 
+    geom_sf(data = homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], aes(color = Year), shape = 16, size = 3) #+
+    #' #'  Constrain plot to bbox of the experimental population area
+    #' coord_sf(xlim = c(-114.53588, -103.04233), ylim = c(31.96210, 35.53438), expand = FALSE)
   
   #'  Save
   # st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Den",], "./Shapefiles/Homesites/homesites_d.kml", driver = "kml", delete_dsn = TRUE)
@@ -87,9 +91,13 @@
   # st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], "./Shapefiles/Homesites/homesites_r.kml", driver = "kml", delete_dsn = TRUE)
   # st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], "./Shapefiles/Homesites/homesites_rendezvous.shp")
   
-  #'  Explore homesites by year, pack, and type (den vs rendezvous)
-  
-  
+  #'  Explore data
+  #'  Which den site falls way outside experimental population area?
+  home_exp_intersection <- st_intersection(homesites_wgs84, exp_pop)
+  ggplot(exp_pop) + geom_sf() + geom_sf(data = hwys) + geom_sf(data = home_exp_intersection, aes(color = Year), shape = 16, size = 3)
+  far_away_home <- subset(homesites_wgs84, !(obs %in% home_exp_intersection$obs))
+  #'  2023 den of the Manada del Arroyo pack
+  #'  This pair was released in the state of Chihuahua, Mexico so excluding from analyses
   
   
   
