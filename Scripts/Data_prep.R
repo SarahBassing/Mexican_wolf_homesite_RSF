@@ -16,6 +16,7 @@
   library(readr)
   library(sf)
   library(terra)
+  library(spdep)
   library(adehabitatHR)
   library(tidyverse)
   
@@ -133,7 +134,7 @@
     geom_sf(data = homesite_buffers[homesite_buffers$Site_Type == "Rendezvous",], colour = "black", fill = NA) +
     coord_sf(xlim = c(-109.8417, -107.3039), ylim = c(33.0215, 34.2875), expand = FALSE)
   
-  #'  Which homesites are within 250m of each other?  
+  #'  Identify pairwise combinations of sites that are within 250m of each other
   close_sites <- function(sites) {
     #'  Create a sequential observation for each unique site
     pack_yr <- dplyr::select(sites, "Pack_year") %>% 
@@ -165,30 +166,104 @@
   }
   close_dens <- close_sites(dens)
   close_rnd <- close_sites(rnds)
+  #'  These dfs an be used as comparison to the cluster results below
   
-  #'  Reduce to packs that used approximately the same site over multiple years 
-  #'  (i.e., recurring use of a site across) or relocated to a site <250m away 
-  #'  in the same year
-  close_dens_skinny <- filter(close_dens, pack_A == pack_B) %>%
-    dplyr::select(c("Pack_year.x", "Pack_year.y", "pack_pair", "dist")) %>%
-    mutate(Repeat_DenYear = duplicated(Pack_year.x))
-  # Need to be able to group dens by pack_years that are spatially overlapping but
-  # in some cases a pack will use the same general area repeatedly for several
-  # years (e.g, 2012-2014 cluster) then move to a new area and repeatedly use
-  # same general area for several more years (e.g., 2015-2016 new cluster). Need
-  # to differentiate these two clusters and then randomly draw one location per
-  # cluster for that pack.
+  #'  Group sites based on their proximity and assign a unique cluster ID per group
+  #'  Proximity based on 250m (0.25km)
+  homesite_clusters <- function(sites) {
+    site_groups <- sites %>%
+      #'  Identify neighbors of region points by Euclidean distance
+      #'  Distances measured in km if coordinates are geographic lat/long
+      mutate(cluster_id = dnearneigh(geometry, 0, 0.25) %>% 
+               #'  Find the number of distjoint connected subgraphs (point clusters)
+               n.comp.nb() %>% 
+               #' Extract the comp.id generated with n.comp.nb and append to df
+               getElement("comp.id")) %>%
+      #'  Count the number of sites in each group
+      add_count(cluster_id) %>%
+      relocate(cluster_id, .after = "Pack") %>%
+      relocate(n, .after = "cluster_id")
+    return(site_groups)
+  }
+  den_clusters <- homesite_clusters(dens)
+  rnd_clusters <- homesite_clusters(rnds)
   
-  #'  Filter spatial data to the above sites, then
-  #'  https://stackoverflow.com/questions/77179007/group-spatial-points-by-distance-in-r-how-to-group-cluster-spatial-points-so-gr
-  adj <- st_distance(points)
-  adj <- matrix(as.numeric(as.numeric(adj)) < 11000, nrow = nrow(adj))
-  library(igraph)
-  g <- graph_from_adjacency_matrix(adj)
-  plot(g)
-  df$group <- factor(components(g)$membership)
-  ggplot(rnaturalearth::ne_countries(scale = 10, returnclass = 'sf')) +
-    geom_sf() +
-    geom_point(data = df, aes(x = longitude, y = latitude, color = group)) +
-    coord_sf(xlim = c(71.5, 72.5), ylim = c(-6, -5))
+  #'  Assign a confidence weight to sites based on evidence/comments 
+  den_weights <- den_clusters %>%
+    #'  Highest weight goes to sites that were confirmed or have detailed information about the site (visited)
+    mutate(wgts = ifelse(grepl("Confirmed", Comments), 4, NA),
+           wgts = ifelse(grepl("natal", Comments), 4, wgts),
+           wgts = ifelse(grepl("Natal", Comments), 4, wgts),
+           wgts = ifelse(grepl("Den Description", Comments), 4, wgts),
+           wgts = ifelse(grepl("Failed", Comments), 4, wgts),
+           wgts = ifelse(grepl("failed", Comments), 4, wgts), 
+           #'  Middle weight goes to sites with strong evidence, often identified via GPS clustering
+           wgts = ifelse(grepl("Strong", Comments), 3, wgts),
+           wgts = ifelse(grepl("based on GPS", Comments), 3, wgts),
+           wgts = ifelse(grepl("cluster", Comments), 3, wgts),
+           wgts = ifelse(Pack_year == "Willow Creek_2022", 3, wgts), # assuming ID'd by GPS locations
+           #'  Lowest weight goes to sites with weak evidence or based on approximate triangulation
+           wgts = ifelse(grepl("Weak", Comments), 1, wgts),
+           wgts = ifelse(Pack_year == "Luna_2019" | Pack_year == "Luna_2020", 1, wgts),
+           #'  Assign middle-low weight value for sites with no comments (assuming 
+           #'  these sites were identified by GPS)
+           wgts = ifelse(is.na(wgts), 2, wgts))
+  
+  rnd_weights <- rnd_clusters %>%
+    #'  Highest weight goes to sites that were confirmed or have detailed information about pups/the site
+    mutate(wgts = ifelse(grepl("Confirmed", Comments), 4, NA),
+           wgts = ifelse(grepl("visual", Comments), 4, wgts),
+           wgts = ifelse(grepl("pups", Comments), 4, wgts),
+           wgts = ifelse(grepl("Rendezvous", Comments), 4, wgts),
+           #'  Middle weight goes to sites with strong evidence, often identified via GPS clustering
+           wgts = ifelse(grepl("Strong", Comments), 3, wgts),
+           wgts = ifelse(grepl("Moved", Comments), 3, wgts), 
+           #'  Lowest weight goes to sites with weak evidence
+           wgts = ifelse(grepl("Weak", Comments), 1, wgts),
+           #'  Assign middle-low weight value for sites with no comments (assuming 
+           #'  these sites were identified by GPS)
+           wgts = ifelse(is.na(wgts), 2, wgts))
+  
+  #'  Randomly select one site per pack per cluster to keep for RSF analyses
+  #'  Need to exclude repeat use of sites by the same pack to keep each "used" 
+  #'  observation in the RSF as independent as possible (i.e., some packs re-use
+  #'  same den or rendezvous every year - multiple used points at this location 
+  #'  is not representative of what the population is selecting for)
+  reduce_sites <- function(sites) {
+    #'  Set seed so sampling is reproducible
+    set.seed(2024)
+    site_random_sample <- sites %>%
+      #'  Grouping by pack and cluster allows same site to be used by different
+      #'  packs but prevents same site from being used by one pack multiple times
+      group_by(Pack, cluster_id) %>%
+      #'  Weight observations by strength of confidence and draw 1 sample
+      slice_sample(n = 1, weight_by = wgts) %>%
+      ungroup()
+    return(site_random_sample)
+  }
+  den_sample <- reduce_sites(den_weights)
+  rnd_sample <- reduce_sites(rnd_weights)
+
+  #'  Merge sampled den and rendezvous sites into single df
+  used_homesites <- den_sample %>%
+    dplyr::select(-NewDen_SameYear) %>%
+    bind_rows(rnd_sample)
+
+  #'  Create single MCP that includes den and rendezvous sites
+  used_homesites_sp <- as(used_homesites, "Spatial")
+  homesite_mcp <- mcp(used_homesites_sp, percent = 100) 
+  homesite_mcp_sf <- st_as_sf(homesite_mcp)
+  #'  Hacky way to estimate "radius" of polygon (pretending it's a perfect square)
+  (mcp_radius <- as.numeric(sqrt(st_area(homesite_mcp_sf))/2)) # as.numeric(sqrt(st_area(homesite_mcp_sf)/pi)/2) if it was a perfect circle
+  #'  Buffer MCP by 50% available habitat extends beyond known used sites
+  library(rgeos)
+  homesite_mcp_buff <- gBuffer(homesite_mcp, width = mcp_radius)
+  # homesite_mcp_buff <- st_buffer(homesite_mcp_sf, mcp_radius)
+  # st_area(homesite_mcp_buff)/st_area(homesite_mcp_sf)
+
+  plot(homesite_mcp_buff[1])
+  plot(homesite_mcp[1], add = T, col = "red")
+  
+  
+  ##### BUFFERING NOT WORKING  ####
   
