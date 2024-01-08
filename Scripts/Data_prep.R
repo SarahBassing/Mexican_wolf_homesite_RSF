@@ -188,7 +188,12 @@
   den_clusters <- homesite_clusters(dens)
   rnd_clusters <- homesite_clusters(rnds)
   
-  #'  Assign a confidence weight to sites based on evidence/comments 
+  #'  Assign a confidence weight to sites based on comments in data or pers. comm.
+  #'  from J. Oakleaf & A. Greenleaf
+  #'  Prior to 2012: located dens via flights (higher error)
+  #'  2012 - 2015: identified dens via den visits (lower error)
+  #'  2015-present: identified dens via GPS clusters & den visits if crossfostering occurred
+  #'  Most rendezvous sites identified via GPS clusters and not visited
   den_weights <- den_clusters %>%
     #'  Highest weight goes to sites that were confirmed or have detailed information about the site (visited)
     mutate(wgts = ifelse(grepl("Confirmed", Comments), 4, NA),
@@ -207,7 +212,7 @@
            wgts = ifelse(Pack_year == "Luna_2019" | Pack_year == "Luna_2020", 1, wgts),
            #'  Assign middle-low weight value for sites with no comments (assuming 
            #'  these sites were identified by GPS)
-           wgts = ifelse(is.na(wgts), 2, wgts))
+           wgts = ifelse(is.na(wgts), 2, wgts))  ##### Update this base on year!
   
   rnd_weights <- rnd_clusters %>%
     #'  Highest weight goes to sites that were confirmed or have detailed information about pups/the site
