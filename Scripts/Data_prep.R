@@ -34,7 +34,7 @@
   #'  Load spatial data
   usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
   hwys <- st_read("./Shapefiles/GEE/PrimaryRoads_AZ_NM.shp") %>% st_transform(wgs84)
-  dem <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico.tif")
+  dem <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico.tif"); res(dem)
   # slope1 <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico-1.tif")
   # slope2 <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico-2.tif")
   
@@ -100,6 +100,10 @@
   #'  2023 den of the Manada del Arroyo pack
   #'  This pair was released in the state of Chihuahua, Mexico so excluding from analyses
   homesites_wgs84_usa <- filter(homesites_wgs84, Pack != "Manada del Arroyo")
+  
+  #'  What's the min and max elevation (meters) of homesites? Using 30m res DEM
+  homesite_elev <- terra::extract(dem, homesites_wgs84_usa)
+  range(homesite_elev$elevation) # min = 1736, max = 3227
   
   #'  Split out dens and rendezvous sites
   dens <- filter(homesites_wgs84_usa, Site_Type == "Den") %>%
