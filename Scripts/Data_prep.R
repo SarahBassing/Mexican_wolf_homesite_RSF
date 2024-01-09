@@ -314,5 +314,7 @@
   ggplot(exp_pop) + geom_sf() + geom_sf(data = homesite_mcp_buff, color = "red") + geom_sf(data = zone1, fill = "gray25", alpha = 0.30) +
     geom_sf(data = homesites_nad27[homesites_nad27$Site_Type == "Rendezvous",], aes(color = Year), shape = 16, size = 1.5)
   
-
+  homesite_mcp_buff_wgs84 <- st_transform(homesite_mcp_buff, wgs84)
+  st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.shp")
+  st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.kml", driver = "kml", delete_dsn = TRUE)
   
