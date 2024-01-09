@@ -25,18 +25,25 @@
     mutate(Pack_year = paste0(Pack, "_", Year)) %>%
     relocate(Pack_year, .before = Year)
   
-  #'  Define projection
-  wgs84 <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
-  #' ESRI:102003 USA_Contiguous_Albers_Equal_Area_Conic
-  aea <- st_crs("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs")
+  #'  Load recovery zones and reproject
+  exp_pop <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/MWEPA Final.shp")
+  nad27_12N <- st_crs(exp_pop)
+  zone1 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_1.shp") %>% st_transform(nad27_12N)
+  zone2 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_2.shp") %>% st_transform(nad27_12N)
+  zone3 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_3.shp") %>% st_transform(nad27_12N)
+
+  #'  Review each zones within context of larger experimental population area boundary
+  ggplot(exp_pop) + geom_sf() + geom_sf(data = zone1) #'  Recovery zone 1
+  ggplot(exp_pop) + geom_sf() + geom_sf(data = zone2) #'  Recovyer zone 2
+  ggplot(exp_pop) + geom_sf() + geom_sf(data = zone3) #'  Recovery zone 3
   
+  #'  Define WGS84 coordinate system
+  wgs84 <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
   
   #'  Load spatial data
   usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
   hwys <- st_read("./Shapefiles/GEE/PrimaryRoads_AZ_NM.shp") %>% st_transform(wgs84)
   dem <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico.tif"); res(dem)
-  # slope1 <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico-1.tif")
-  # slope2 <- terra::rast("./Shapefiles/GEE/Slope_Arizona_NewMexico-2.tif")
   
   #'  Filter and create new sf objects
   #'  AZ & NM polygon
@@ -57,34 +64,48 @@
     st_collection_extract("POLYGON")
   split_southwest$include <- factor(seq_len(nrow(split_southwest)))
   ggplot(split_southwest) + geom_sf(aes(fill = include))
-  #'  Filter to experimental population area and anything south of I40
-  exp_pop <- filter(split_southwest, include == 2); st_crs(exp_pop); st_bbox(exp_pop)
+  #'  Filter to SBB defined experimental population area and anything south of I40
+  exp_pop_sbb_defined <- filter(split_southwest, include == 2); st_crs(exp_pop_sbb_defined); st_bbox(exp_pop_sbb_defined)
   southI40 <- filter(split_southwest, include != 1) %>% st_union(); st_crs(southI40); st_bbox(southI40)
-  ggplot(exp_pop) + geom_sf();  ggplot(az_nm) + geom_sf() + geom_sf(data = southI40)
+  ggplot(exp_pop_sbb_defined) + geom_sf();  ggplot(az_nm) + geom_sf() + geom_sf(data = southI40)
+  
+  #'  Recovery zone 1 bounding box
+  st_bbox(zone1)
+  zone1_bbox <- st_as_sfc(st_bbox(zone1))
+  zone1_extent_wgs84 <- st_transform(zone1_bbox, wgs84)
   
   #'  Save select features
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.shp")
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.kml", driver = "kml", delete_dsn = TRUE)
-  # st_write(exp_pop, "./Shapefiles/experimental_pop_poly.shp")
+  # st_write(exp_pop_sbb_defined, "./Shapefiles/experimental_pop_poly.shp")
   # st_write(southI40, "./Shapefiles/I40_south_poly.shp")
+  # st_write(zone1_extent_wgs84, "./Shapefiles/RecoveryZone1_bbox_wgs84.shp)
   
   #'  Create a sf object for locations
   spatial_locs <- function(locs, proj) {
     locs <- arrange(locs, Pack_year)
     sf_locs <- st_as_sf(locs, coords = c("Longitude", "Latitude"), crs = wgs84) %>%
       mutate(obs = seq(1:nrow(.))) %>%
-      relocate(obs, .before = Pack_year) #%>%
-      # st_transform(proj)
+      relocate(obs, .before = Pack_year) %>%
+      st_transform(proj)
     return(sf_locs)
   }
   homesites_wgs84 <- spatial_locs(homesites, wgs84)
+  homesites_nad27 <- spatial_locs(homesites, nad27_12N)
 
-  ggplot(exp_pop) + geom_sf() + geom_sf(data = hwys) + 
+  #'  Visualize homesites within SBB created experimental population area boundary
+  ggplot(exp_pop_sbb_defined) + geom_sf() + geom_sf(data = hwys) + 
     geom_sf(data = homesites_wgs84[homesites_wgs84$Site_Type == "Den",], aes(color = Year), shape = 16, size = 3) 
-  ggplot(exp_pop) + geom_sf() + geom_sf(data = hwys) + 
+  ggplot(exp_pop_sbb_defined) + geom_sf() + geom_sf(data = hwys) + 
     geom_sf(data = homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], aes(color = Year), shape = 16, size = 3) #+
     #' #'  Constrain plot to bbox of the experimental population area
     #' coord_sf(xlim = c(-114.53588, -103.04233), ylim = c(31.96210, 35.53438), expand = FALSE)
+  
+  #'  Visualize homesites within Recovery Zone 1
+  ggplot(zone1_bbox) + geom_sf() + geom_sf(data = zone1) + 
+    geom_sf(data = homesites_nad27[homesites_nad27$Site_Type == "Den",], aes(color = Year), shape = 16, size = 3) 
+  ggplot(zone1_bbox) + geom_sf() + geom_sf(data = zone1) + 
+    geom_sf(data = homesites_nad27[homesites_nad27$Site_Type == "Rendezvous",], aes(color = Year), shape = 16, size = 3)
   
   #'  Save
   # st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Den",], "./Shapefiles/Homesites/homesites_d.kml", driver = "kml", delete_dsn = TRUE)
@@ -94,15 +115,15 @@
   
   #'  Explore data
   #'  Which den site falls way outside experimental population area?
-  home_exp_intersection <- st_intersection(homesites_wgs84, exp_pop)
-  ggplot(exp_pop) + geom_sf() + geom_sf(data = hwys) + geom_sf(data = home_exp_intersection, aes(color = Year), shape = 16, size = 3)
+  home_exp_intersection <- st_intersection(homesites_wgs84, exp_pop_sbb_defined)
+  ggplot(exp_pop_sbb_defined) + geom_sf() + geom_sf(data = hwys) + geom_sf(data = home_exp_intersection, aes(color = Year), shape = 16, size = 3)
   far_away_home <- subset(homesites_wgs84, !(obs %in% home_exp_intersection$obs))
   #'  2023 den of the Manada del Arroyo pack
   #'  This pair was released in the state of Chihuahua, Mexico so excluding from analyses
   homesites_wgs84_usa <- filter(homesites_wgs84, Pack != "Manada del Arroyo")
   
   #'  What's the min and max elevation (meters) of homesites? Using 30m res DEM
-  homesite_elev <- terra::extract(dem, homesites_wgs84_usa)
+  homesite_elev <- terra::extract(dem, vect(homesites_wgs84_usa))
   range(homesite_elev$elevation) # min = 1736, max = 3227
   
   #'  Split out dens and rendezvous sites
@@ -121,7 +142,7 @@
   multiple_dens <- filter(dens, NewDen_SameYear == "TRUE")
   den_moves <- subset(homesites, (Pack_year %in% multiple_dens$Pack_year)) %>%
     filter(Site_Type == "Den")
-  write_csv(den_moves, "./Data/Multiple_den_sites.csv")
+  # write_csv(den_moves, "./Data/Multiple_den_sites.csv")
   
   #'  Create buffer around each homesite (width in meters)
   st_bbox(homesites_wgs84_usa)
@@ -129,11 +150,11 @@
     vect() %>%
     terra::buffer(width = 1000) %>%
     st_as_sf()
-  ggplot(exp_pop) + geom_sf() + 
+  ggplot(exp_pop_sbb_defined) + geom_sf() + 
     geom_sf(data = dens, aes(color = Year), shape = 16) +
     geom_sf(data = homesite_buffers[homesite_buffers$Site_Type == "Den",], colour = "black", fill = NA) +
     coord_sf(xlim = c(-109.8417, -107.3039), ylim = c(33.0215, 34.2875), expand = FALSE)
-  ggplot(exp_pop) + geom_sf() + 
+  ggplot(exp_pop_sbb_defined) + geom_sf() + 
     geom_sf(data = rnds, aes(color = Year), shape = 16) +
     geom_sf(data = homesite_buffers[homesite_buffers$Site_Type == "Rendezvous",], colour = "black", fill = NA) +
     coord_sf(xlim = c(-109.8417, -107.3039), ylim = c(33.0215, 34.2875), expand = FALSE)
