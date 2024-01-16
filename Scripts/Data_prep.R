@@ -319,3 +319,50 @@
   # st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.shp")
   # st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.kml", driver = "kml", delete_dsn = TRUE)
   
+  
+  #'  Number of available locations to generate per used location 
+  avail_pts <- 20
+  
+  #'  Function to generate random available locations based on number of used locations
+  sample_avail_locs <- function(locs, navail) {
+    #'  Number of used locations
+    nused <- nrow(locs)
+    print(nused)
+    
+    #'  Total number of available locations to generate
+    navailable <- nused * navail
+    
+    #'  Set seed for reproducibility
+    set.seed(108)
+    
+    #'  Draw random sample of locations within the buffered MCP
+    rndpts <- st_sample(homesite_mcp_buff, size = navailable, type = "random", exact = TRUE) %>%
+      #'  Reformat to a normal sf object
+      st_as_sf() %>%
+      mutate(obs = seq(1:nrow(.))) %>%
+      relocate(obs, .before = x) %>%
+      rename(geometry = x)
+    
+    #'  Plot available points within buffered MCP
+    avail_locs_plot <- ggplot(exp_pop) + geom_sf() + 
+      geom_sf(data = homesite_mcp_buff, color = "red") + 
+      geom_sf(data = zone1, fill = "gray25", alpha = 0.30) +
+      geom_sf(data = rndpts, shape = 16, size = 0.5, color = "blue") 
+    plot(avail_locs_plot)
+  
+    return(rndpts)
+  }
+  avail_locs_den <- sample_avail_locs(den_sample, navail = avail_pts)
+  avail_locs_rnd <- sample_avail_locs(rnd_sample, navail = avail_pts)
+  
+  #'  Reproject available locations
+  avail_locs_den_wgs84 <- st_transform(avail_locs_den, wgs84)
+  avail_locs_rnd_wgs84 <- st_transform(avail_locs_rnd, wgs84)
+  
+  #'  Save available locations
+  # st_write(avail_locs_den_wgs84, "./Shapefiles/Homesites/Available_locations_den.shp")
+  # st_write(avail_locs_den_wgs84, "./Shapefiles/Homesites/Available_locations_den.kml", driver = "kml", delete_dsn = TRUE)
+  # st_write(avail_locs_rnd_wgs84, "./Shapefiles/Homesites/Available_locations_rnd.shp")
+  # st_write(avail_locs_rnd_wgs84, "./Shapefiles/Homesites/Available_locations_rnd.kml", driver = "kml", delete_dsn = TRUE)
+  
+  
