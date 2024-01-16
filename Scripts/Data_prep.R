@@ -31,10 +31,11 @@
   zone1 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_1.shp") %>% st_transform(nad27_12N)
   zone2 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_2.shp") %>% st_transform(nad27_12N)
   zone3 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_3.shp") %>% st_transform(nad27_12N)
+  exp_pop_wgs84 <- st_transform(exp_pop, wgs84)
 
   #'  Review each zones within context of larger experimental population area boundary
   ggplot(exp_pop) + geom_sf() + geom_sf(data = zone1) #'  Recovery zone 1
-  ggplot(exp_pop) + geom_sf() + geom_sf(data = zone2) #'  Recovyer zone 2
+  ggplot(exp_pop) + geom_sf() + geom_sf(data = zone2) #'  Recovery zone 2
   ggplot(exp_pop) + geom_sf() + geom_sf(data = zone3) #'  Recovery zone 3
   
   #'  Define WGS84 coordinate system
@@ -78,6 +79,7 @@
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.shp")
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.kml", driver = "kml", delete_dsn = TRUE)
   # st_write(exp_pop_sbb_defined, "./Shapefiles/experimental_pop_poly.shp")
+  # st_write(exp_pop_wgs84, "./Shapefiles/experimental_pop_poly_wgs84.shp")
   # st_write(southI40, "./Shapefiles/I40_south_poly.shp")
   # st_write(zone1_extent_wgs84, "./Shapefiles/RecoveryZone1_bbox_wgs84.shp")
   
@@ -172,10 +174,10 @@
     #'  Calculate pairwise distances between all sites
     dist_btwn_sites <- sites$geometry %>% 
       st_distance()
-    #'  Identify which pairings were within 100m of each other
+    #'  Identify which pairings were within 250m of each other
     indices <- which(dist_btwn_sites <= units::set_units(250, "m"), arr.ind = TRUE)
-    #'  Simplify distance matrix into a dataframe where 1st column = matrix rows,
-    #'  2nd column = matrix columns, and 3rd column = distance IF < 100m between
+    #'  Simplify distance matrix into a data frame where 1st column = matrix rows,
+    #'  2nd column = matrix columns, and 3rd column = distance IF < 250m between
     #'  sites indexed by matrix row and column
     indices_df <- as.data.frame(indices)
     indices_df$dist <- as.numeric(dist_btwn_sites[indices])
@@ -321,7 +323,7 @@
   
   
   #'  Number of available locations to generate per used location 
-  avail_pts <- 20
+  avail_pts <- 200
   
   #'  Function to generate random available locations based on number of used locations
   sample_avail_locs <- function(locs, navail) {
