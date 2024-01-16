@@ -79,7 +79,7 @@
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.kml", driver = "kml", delete_dsn = TRUE)
   # st_write(exp_pop_sbb_defined, "./Shapefiles/experimental_pop_poly.shp")
   # st_write(southI40, "./Shapefiles/I40_south_poly.shp")
-  # st_write(zone1_extent_wgs84, "./Shapefiles/RecoveryZone1_bbox_wgs84.shp)
+  # st_write(zone1_extent_wgs84, "./Shapefiles/RecoveryZone1_bbox_wgs84.shp")
   
   #'  Create a sf object for locations
   spatial_locs <- function(locs, proj) {
@@ -301,7 +301,7 @@
   (mcp_radius_crl <- as.numeric(sqrt(st_area(homesite_mcp_sf)/pi)/2)) #if polygon was a perfect circle
   
   #'  Buffer MCP by its ~radius so the available habitat extends beyond known used sites
-  homesite_mcp_buff <- st_buffer
+  homesite_mcp_buff <- st_buffer(homesite_mcp_sf, mcp_radius_crl)
   #'  How much bigger is the buffered MCP compared to the original?
   st_area(homesite_mcp_buff)/st_area(homesite_mcp_sf)
   
