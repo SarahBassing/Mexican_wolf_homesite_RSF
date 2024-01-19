@@ -233,6 +233,11 @@
            wgts = ifelse(grepl("Den Description", Comments), 4, wgts),
            wgts = ifelse(grepl("Failed", Comments), 4, wgts),
            wgts = ifelse(grepl("failed", Comments), 4, wgts), 
+           #'  Downgrade sites with den descriptions that were not the natal den 
+           #'  (moved from original den so selection process was slightly different)
+           wgts = ifelse(Pack_year == "Iron Creek_2015" & Latitude == "33.460212", 3, wgts),
+           wgts = ifelse(Pack_year == "Maverick_2014" & Latitude == "33.788296", 3, wgts),
+           wgts = ifelse(Pack_year == "Rim_2014" & Latitude == "33.619844", 3, wgts),
            #'  Middle weight goes to sites with strong evidence, often identified via GPS clustering
            wgts = ifelse(grepl("Strong", Comments), 3, wgts),
            wgts = ifelse(grepl("based on GPS", Comments), 3, wgts),
@@ -241,6 +246,8 @@
            #'  Lowest weight goes to sites with weak evidence or based on approximate triangulation
            wgts = ifelse(grepl("Weak", Comments), 1, wgts),
            wgts = ifelse(Pack_year == "Luna_2019" | Pack_year == "Luna_2020", 1, wgts),
+           #'  Medium-low weight to assumed natal den site but had weak evidence for location
+           wgts = ifelse(Pack_year == "Hawks Nest_2001" & Latitude == "33.869912", 2, wgts),
            #'  Assign low to medium weights for sites with no comments based on 
            #'  year and type of monitoring at that time (<2012 flights, 2012-2015 
            #'  den visits, 2015+ GPS clusters)
