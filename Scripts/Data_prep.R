@@ -21,7 +21,7 @@
   library(tidyverse)
   
   #'  Load used locations
-  homesites <- read_csv("./Data/MexWolf_dens_rend_sites_1998_2023.csv") %>%
+  homesites <- read_csv("./Data/MexWolf_dens_rend_sites_1998_2023_updated_01.19.24") %>%
     mutate(Pack_year = paste0(Pack, "_", Year)) %>%
     relocate(Pack_year, .before = Year)
   
