@@ -46,24 +46,27 @@
   #'  x, y, and z values within each pixel's neighborhood
   #'  |r| = sqrt((sum(x)^2) + (sum(y)^2) + (sum(z)^2))
   r <- sqrt((x.sum^2) + (y.sum^2) + (z.sum^2))
+  writeRaster(r, "./Shapefiles/Terrain_variables/r.tif")
   
   #'  5) Calculate standardized ruggedness value per pixel
-  #'  Values range 0 (flat) - 1 (most) rugged
-  ncells <- ncell(r)
+  #'  ruggedness = 1 - (|r|/n) where n = number of pixels used to estimate |r|
+  #'  Values can range 0 (flat) - 1 (most rugged)
+  ncells <- neighborhood * neighborhood
   vrm <- 1 - (r/ncells)
+  writeRaster(vrm, "./Shapefiles/Terrain_variables/VRM.tif", overwrite = TRUE)
   
   #'  Review vrm attributes (min, max, mean, and sd of pixel values)
-  minmax(vrm, compute = FALSE)
+  minmax(vrm)
   app(vrm, mean)
   app(vrm, sd)
-  
+  plot(vrm)
   
   ####  Surface curvatures  ####
   #'  Profile curvature: second derivative of elevation surface (slope of the slope)
   #'  i.e., direction of the maximum slope where (-) values indicate surface is 
   #'  upwardly convex and (+) values indicate surface is upwardly concave. Values
   #'  of 0 indicate flat surface.
-  profcurv <- terra::curvature(dem, type = "profile")
+  profcurv <- curvature(dem, type = "profile")
   
   #'  Total curvature: sigma of the profile and planform curvatures (planform is 
   #'  perpendicular to direction of maximum slope).
