@@ -1,5 +1,5 @@
   #'  ------------------------
-  #'  Data prepartion
+  #'  Used and Available locations
   #'  Mexican wolf project
   #'  Sarah B. Bassing
   #'  December 2023
@@ -21,9 +21,12 @@
   library(tidyverse)
   
   #'  Load used locations
-  homesites <- read_csv("./Data/MexWolf_dens_rend_sites_1998_2023_updated_01.19.24") %>%
+  homesites <- read_csv("./Data/MexWolf_dens_rend_sites_1998_2023_updated_01.19.24.csv") %>%
     mutate(Pack_year = paste0(Pack, "_", Year)) %>%
     relocate(Pack_year, .before = Year)
+  
+  #'  Define WGS84 coordinate system
+  wgs84 <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
   
   #'  Load recovery zones and reproject
   exp_pop <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/MWEPA Final.shp")
@@ -37,9 +40,6 @@
   ggplot(exp_pop) + geom_sf() + geom_sf(data = zone1) #'  Recovery zone 1
   ggplot(exp_pop) + geom_sf() + geom_sf(data = zone2) #'  Recovery zone 2
   ggplot(exp_pop) + geom_sf() + geom_sf(data = zone3) #'  Recovery zone 3
-  
-  #'  Define WGS84 coordinate system
-  wgs84 <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
   
   #'  Load spatial data
   usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
@@ -235,9 +235,9 @@
            wgts = ifelse(grepl("failed", Comments), 4, wgts), 
            #'  Downgrade sites with den descriptions that were not the natal den 
            #'  (moved from original den so selection process was slightly different)
-           wgts = ifelse(Pack_year == "Iron Creek_2015" & Latitude == "33.460212", 3, wgts),
-           wgts = ifelse(Pack_year == "Maverick_2014" & Latitude == "33.788296", 3, wgts),
-           wgts = ifelse(Pack_year == "Rim_2014" & Latitude == "33.619844", 3, wgts),
+           wgts = ifelse(Pack_year == "Iron Creek_2015" & !grepl("Natal den", Comments), 3, wgts),
+           wgts = ifelse(Pack_year == "Maverick_2014" & !grepl("natal", Comments), 3, wgts),
+           wgts = ifelse(Pack_year == "Rim_2014" & !grepl("Natal den", Comments), 3, wgts),
            #'  Middle weight goes to sites with strong evidence, often identified via GPS clustering
            wgts = ifelse(grepl("Strong", Comments), 3, wgts),
            wgts = ifelse(grepl("based on GPS", Comments), 3, wgts),
@@ -247,7 +247,7 @@
            wgts = ifelse(grepl("Weak", Comments), 1, wgts),
            wgts = ifelse(Pack_year == "Luna_2019" | Pack_year == "Luna_2020", 1, wgts),
            #'  Medium-low weight to assumed natal den site but had weak evidence for location
-           wgts = ifelse(Pack_year == "Hawks Nest_2001" & Latitude == "33.869912", 2, wgts),
+           wgts = ifelse(Pack_year == "Hawks Nest_2001" & grepl("natal den", Comments), 2, wgts),
            #'  Assign low to medium weights for sites with no comments based on 
            #'  year and type of monitoring at that time (<2012 flights, 2012-2015 
            #'  den visits, 2015+ GPS clusters)
@@ -318,19 +318,21 @@
   #'  100% MCP and buffered MCP
   ggplot(homesite_mcp_buff) + geom_sf() + geom_sf(data = homesite_mcp_sf)
   #'  Den/rendezvous sites within buffered MCP and Zone 1 for context within Exp. Pop. Area
-  ggplot(exp_pop) + geom_sf() + geom_sf(data = homesite_mcp_buff, color = "red") + geom_sf(data = zone1, fill = "gray25", alpha = 0.30) +
+  ggplot(exp_pop) + geom_sf() + geom_sf(data = homesite_mcp_buff, color = "red") + 
+    geom_sf(data = homesite_mcp_sf, color = "blue") + geom_sf(data = zone1, fill = "gray25", alpha = 0.30) +
     geom_sf(data = homesites_nad27[homesites_nad27$Site_Type == "Den",], aes(color = Year), shape = 16, size = 1.5) 
-  ggplot(exp_pop) + geom_sf() + geom_sf(data = homesite_mcp_buff, color = "red") + geom_sf(data = zone1, fill = "gray25", alpha = 0.30) +
+  ggplot(exp_pop) + geom_sf() + geom_sf(data = homesite_mcp_buff, color = "red") + 
+    geom_sf(data = homesite_mcp_sf, color = "blue") + geom_sf(data = zone1, fill = "gray25", alpha = 0.30) +
     geom_sf(data = homesites_nad27[homesites_nad27$Site_Type == "Rendezvous",], aes(color = Year), shape = 16, size = 1.5)
   
-  #'  Save as shapefile and kml
-  # homesite_mcp_buff_wgs84 <- st_transform(homesite_mcp_buff, wgs84); st_bbox(homesite_mcp_buff_wgs84)
-  # st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.shp")
-  # st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.kml", driver = "kml", delete_dsn = TRUE)
+  #' #'  Save as shapefile and kml
+  #' homesite_mcp_buff_wgs84 <- st_transform(homesite_mcp_buff, wgs84); st_bbox(homesite_mcp_buff_wgs84)
+  #' st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.shp")
+  #' st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.kml", driver = "kml", delete_dsn = TRUE)
   
   
   #'  Number of available locations to generate per used location 
-  avail_pts <- 200
+  avail_pts <- 1000
   
   #'  Function to generate random available locations based on number of used locations
   sample_avail_locs <- function(locs, navail) {
