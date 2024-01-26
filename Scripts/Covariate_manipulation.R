@@ -4,11 +4,9 @@
   #'  ----------------
   
   #'  Load libraries
-  # install.packages("remotes")
-  # remotes::install_github("ailich/MultiscaleDEM")
-  # library(MultiscaleDEM)
   library(sf)
   library(terra)
+  library(spatialEco)
   library(tidyverse)
   
   #'  Load spatial data
@@ -22,7 +20,10 @@
   # writeRaster(aspect, "./Shapefiles/Terrain_variables/aspect.tif")
   
   
-  ####  Vector Ruggedness Measure (VRM)  ####
+  #'  -------------------------------
+  ####  Calculate terrain variables  ####
+  #'  -------------------------------
+  #####  Vector Ruggedness Measure (VRM)  #####
   #'  Using VRM to represent surface roughness
   #'  1) Decompose DEM into x, y, & z components using trigonometric operators 
   z <- 1 * cos(slope)
@@ -61,15 +62,17 @@
   app(vrm, sd)
   plot(vrm)
   
-  ####  Surface curvatures  ####
+  #####  Surface curvatures  #####
   #'  Profile curvature: second derivative of elevation surface (slope of the slope)
   #'  i.e., direction of the maximum slope where (-) values indicate surface is 
   #'  upwardly convex and (+) values indicate surface is upwardly concave. Values
   #'  of 0 indicate flat surface.
   profcurv <- curvature(dem, type = "profile")
+  writeRaster(profcurv, "./Shapefiles/Terrain_variables/Profile_curvature.tif", overwrite = TRUE)
   
   #'  Total curvature: sigma of the profile and planform curvatures (planform is 
-  #'  perpendicular to direction of maximum slope).
-  meancurv <- terra::curvature(dem, type = "total")
+  #'  perpendicular to direction of maximum slope)
+  meancurv <- curvature(dem, type = "total")
+  writeRaster(meancurv, "./Shapefiles/Terrain_variables/Mean_curvature.tif", overwrite = TRUE)
   
   
