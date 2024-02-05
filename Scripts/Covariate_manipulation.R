@@ -10,7 +10,7 @@
   library(tidyverse)
   
   #'  Load spatial data
-  dem <- terra::rast("./Shapefiles/Terrain_variables/Mosaic_DEM_WGS84.tif"); res(dem); st_crs(dem)
+  dem <- terra::rast("./Shapefiles/Terrain_variables/Mosaic_DEM.tif"); res(dem); st_crs(dem)
   
   #'  Generate terrain data from DEM
   slope <- terrain(dem, v = "slope", neighbors = 8, unit = "degrees")
@@ -19,8 +19,8 @@
   res(slope); crs(slope)
   res(aspect); crs(aspect)
   
-  # writeRaster(slope, "./Shapefiles/Terrain_variables/slope_wgs84.tif")
-  # writeRaster(aspect, "./Shapefiles/Terrain_variables/aspect_wgs84.tif")
+  # writeRaster(slope, "./Shapefiles/Terrain_variables/slope.tif")
+  # writeRaster(aspect, "./Shapefiles/Terrain_variables/aspect.tif")
   
   
   #'  -------------------------------
@@ -42,22 +42,22 @@
   y.sum <- focal(y, neighborhood, sum) 
   z.sum <- focal(z, neighborhood, sum) 
   
-  writeRaster(x.sum, "./Shapefiles/Terrain_variables/VRM parts/x.sum_wgs84.tif")
-  writeRaster(y.sum, "./Shapefiles/Terrain_variables/VRM parts/y.sum_wgs84.tif")
-  writeRaster(z.sum, "./Shapefiles/Terrain_variables/VRM parts/z.sum_wgs84.tif")
+  writeRaster(x.sum, "./Shapefiles/Terrain_variables/VRM parts/x.sum.tif")
+  writeRaster(y.sum, "./Shapefiles/Terrain_variables/VRM parts/y.sum.tif")
+  writeRaster(z.sum, "./Shapefiles/Terrain_variables/VRM parts/z.sum.tif")
   
   #'  4) Calculate the magnitude of the resultant vector for each pixel based on the
   #'  x, y, and z values within each pixel's neighborhood
   #'  |r| = sqrt((sum(x)^2) + (sum(y)^2) + (sum(z)^2))
   r <- sqrt((x.sum^2) + (y.sum^2) + (z.sum^2))
-  writeRaster(r, "./Shapefiles/Terrain_variables/VRM parts/r_wgs84.tif")
+  writeRaster(r, "./Shapefiles/Terrain_variables/VRM parts/r.tif")
   
   #'  5) Calculate standardized ruggedness value per pixel
   #'  ruggedness = 1 - (|r|/n) where n = number of pixels used to estimate |r|
   #'  Values can range 0 (flat) - 1 (most rugged)
   ncells <- neighborhood * neighborhood
   vrm <- 1 - (r/ncells)
-  writeRaster(vrm, "./Shapefiles/Terrain_variables/VRM_wgs84.tif", overwrite = TRUE)
+  writeRaster(vrm, "./Shapefiles/Terrain_variables/VRM.tif", overwrite = TRUE)
   
   #'  Review vrm attributes (min, max, mean, and sd of pixel values)
   minmax(vrm)
@@ -93,7 +93,7 @@
   }
   tst <- my_curves(dem, type = "profile")
   
-  curvature <- function(x, type = c("planform", "profile", "total", "gaussian", "mcnab", "bolstad"), ...) { 
+  my_curves <- function(x, type = c("planform", "profile", "total", "gaussian", "mcnab", "bolstad"), ...) { 
     if(!inherits(x, "SpatRaster"))
       stop(deparse(substitute(x)), " must be a terra SpatRaster object")
     m <- matrix(1, nrow=3, ncol=3)
@@ -133,7 +133,7 @@
       return( terra::focal(x, w=m, fun = zt.crv, fillvalue = 0, ...) )
     #}
   }	
-  tst <- curvature(dem, type = "profile")
+  gaus_curv <- my_curves(dem, type = "gaussian")
   
   
   
