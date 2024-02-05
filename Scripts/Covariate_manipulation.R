@@ -42,15 +42,15 @@
   y.sum <- focal(y, neighborhood, sum) 
   z.sum <- focal(z, neighborhood, sum) 
   
-  writeRaster(x.sum, "./Shapefiles/Terrain_variables/x.sum_wgs84.tif")
-  writeRaster(y.sum, "./Shapefiles/Terrain_variables/y.sum_wgs84.tif")
-  writeRaster(z.sum, "./Shapefiles/Terrain_variables/z.sum_wgs84.tif")
+  writeRaster(x.sum, "./Shapefiles/Terrain_variables/VRM parts/x.sum_wgs84.tif")
+  writeRaster(y.sum, "./Shapefiles/Terrain_variables/VRM parts/y.sum_wgs84.tif")
+  writeRaster(z.sum, "./Shapefiles/Terrain_variables/VRM parts/z.sum_wgs84.tif")
   
   #'  4) Calculate the magnitude of the resultant vector for each pixel based on the
   #'  x, y, and z values within each pixel's neighborhood
   #'  |r| = sqrt((sum(x)^2) + (sum(y)^2) + (sum(z)^2))
   r <- sqrt((x.sum^2) + (y.sum^2) + (z.sum^2))
-  writeRaster(r, "./Shapefiles/Terrain_variables/r_wgs84.tif")
+  writeRaster(r, "./Shapefiles/Terrain_variables/VRM parts/r_wgs84.tif")
   
   #'  5) Calculate standardized ruggedness value per pixel
   #'  ruggedness = 1 - (|r|/n) where n = number of pixels used to estimate |r|
