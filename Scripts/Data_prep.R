@@ -24,27 +24,35 @@
   homesites <- read_csv("./Data/MexWolf_dens_rend_sites_1998_2023_updated_01.19.24.csv") %>%
     mutate(Pack_year = paste0(Pack, "_", Year)) %>%
     relocate(Pack_year, .before = Year)
+    
+  #'  Load spatial data
+  usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
+  hwys <- st_read("./Shapefiles/GEE/PrimaryRoads_AZ_NM.shp") #%>% st_transform(wgs84)
+  dem <- terra::rast("./Shapefiles/Terrain_variables/Mosaic_DEM.tif"); res(dem); crs(dem)
+  slope <- terra::rast("./Shapefiles/Terrain_variables/slope.tif"); res(slope); crs(slope)
+  vrm <- terra::rast("./Shapefiles/Terrain_variables/VRM.tif"); res(vrm); crs(vrm)
+  gcurve <- terra::rast("./Shapefiles/Terrain_variables/Gaussian_curvature.tif"); res(gcurve); crs(gcurve)
+  dist2water <- terra::rast("./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water.tif"); res(dist2water); crs(dist2water)
+  ndvi_den <- terra::rast("./Shapefiles/Vegetation_variables/Mosaic_Avg_NDVI_Mar_June.tif"); res(ndvi_den); crs(ndvi_den)
+  ndvi_rnd <- terra::rast("./Shapefiles/Vegetation_variables/Mosaic_Avg_NDVI_June_Aug.tif"); res(ndvi_rnd); crs(ndvi_rnd)
   
   #'  Define WGS84 coordinate system
   wgs84 <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
+  nad83 <- st_crs(dem)
   
   #'  Load recovery zones and reproject
-  exp_pop <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/MWEPA Final.shp")
-  nad27_12N <- st_crs(exp_pop)
-  zone1 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_1.shp") %>% st_transform(nad27_12N)
-  zone2 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_2.shp") %>% st_transform(nad27_12N)
-  zone3 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_3.shp") %>% st_transform(nad27_12N)
-  exp_pop_wgs84 <- st_transform(exp_pop, wgs84)
+  exp_pop <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/MWEPA Final.shp"); st_crs(exp_pop)
+  zone1 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_1.shp") %>% st_transform(nad83)
+  zone2 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_2.shp") %>% st_transform(nad83)
+  zone3 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_3.shp") %>% st_transform(nad83)
+  exp_pop_nad83 <- st_transform(exp_pop, nad83)
 
   #'  Review each zones within context of larger experimental population area boundary
   ggplot(exp_pop) + geom_sf() + geom_sf(data = zone1) #'  Recovery zone 1
   ggplot(exp_pop) + geom_sf() + geom_sf(data = zone2) #'  Recovery zone 2
   ggplot(exp_pop) + geom_sf() + geom_sf(data = zone3) #'  Recovery zone 3
   
-  #'  Load spatial data
-  usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
-  hwys <- st_read("./Shapefiles/GEE/PrimaryRoads_AZ_NM.shp") %>% st_transform(wgs84)
-  dem <- terra::rast("./Shapefiles/GEE/DEM_Arizona_NewMexico.tif"); res(dem)
+  
   
   #'  Filter and create new sf objects
   #'  AZ & NM polygon
