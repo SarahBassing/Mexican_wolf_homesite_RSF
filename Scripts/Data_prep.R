@@ -405,8 +405,8 @@
   ####  Gather covariates  ####
   #'  ---------------------
   #'  Create raster stacks of all relevant covariates (must be same grid & res)
-  cov_stack <- c(elev, slope, rough) #, curve
-  gee_stack <- c(ndvi_den, ndvi_rnd) #water, 
+  terrain_stack <- c(elev, slope, rough, curve) 
+  ndvi_stack <- c(ndvi_den, ndvi_rnd) #water, 
   
   #'  DON'T FOREGET TO LOAD WATERBODIES
   #'  Identify large bodies of water (anything larger than 1 sq-km in size)
@@ -416,7 +416,7 @@
   
   #'  Extract covariate values at each used and available location
   get_covs <- function(locs) {
-    
+    tst <- terra::extract(locs, terrain_stack)
   }
   
   
