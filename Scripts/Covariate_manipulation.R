@@ -10,14 +10,17 @@
   library(tidyverse)
   
   #'  Load spatial data
-  dem <- terra::rast("./Shapefiles/GEE/Mosaic_DEM.tif"); res(dem); st_crs(dem)
+  dem <- terra::rast("./Shapefiles/Terrain_variables/Mosaic_DEM_WGS84.tif"); res(dem); st_crs(dem)
   
   #'  Generate terrain data from DEM
   slope <- terrain(dem, v = "slope", neighbors = 8, unit = "degrees")
   aspect <- terrain(dem, v = "aspect", neighbors = 8, unit = "degrees")
   
-  # writeRaster(slope, "./Shapefiles/Terrain_variables/slope.tif")
-  # writeRaster(aspect, "./Shapefiles/Terrain_variables/aspect.tif")
+  res(slope); crs(slope)
+  res(aspect); crs(aspect)
+  
+  # writeRaster(slope, "./Shapefiles/Terrain_variables/slope_wgs84.tif")
+  # writeRaster(aspect, "./Shapefiles/Terrain_variables/aspect_wgs84.tif")
   
   
   #'  -------------------------------
