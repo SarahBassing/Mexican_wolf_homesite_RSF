@@ -37,13 +37,15 @@
   ndvi_den <- terra::rast("./Shapefiles/Vegetation_variables/Mosaic_Avg_NDVI_Mar_June.tif"); res(ndvi_den); crs(ndvi_den)
   ndvi_rnd <- terra::rast("./Shapefiles/Vegetation_variables/Mosaic_Avg_NDVI_June_Aug.tif"); res(ndvi_rnd); crs(ndvi_rnd)
   
-  #'  Empty raster to extract covariates for each pixel for predicting phase of study
-  s <- elev
-  values(s) <- NA
-  s
-  s_gridID <- as.data.frame(s)
-  s_coord <- coordinates(s)
-  s_gridID <- cbind(s_gridID, s_coord)
+  #' #'  Empty raster to extract covariates for each pixel for predicting phase of study
+  #' s <- elev
+  #' values(s) <- NA
+  #' s
+  #' s_gridID <- as.data.frame(s)
+  #' s_coord <- coordinates(s)
+  #' s_grid <- cbind(s_gridID, s_coord)
+  #' #'  Mask large bodies of water from raster
+  #' s_mask <- mask(s, bigwater, inverse = TRUE)
   
   #'  Define WGS84 coordinate systems
   wgs84 <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
@@ -60,7 +62,7 @@
   nad27_12N <- st_crs(exp_pop)
   nad83 <- st_crs(elev)
   
-  #'  State and highway shapefiles
+  #'  State, highway, and waterbody shapefiles
   usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
   hwys <- st_read("./Shapefiles/GEE/PrimaryRoads_AZ_NM.shp") %>% st_transform(wgs84)
   az_nm <- filter(usa, NAME == "Arizona" | NAME == "New Mexico") %>% st_transform(wgs84) 
@@ -68,6 +70,10 @@
   #'  Merge into single "southwest" polygon
   southwest <- st_union(az_nm[az_nm$NAME == "Arizona",], az_nm[az_nm$NAME == "New Mexico",]) %>%
     st_cast("POLYGON")
+  water <- st_read("./Shapefiles/National Hydrography Dataset (NHD)/AZ_NM_waterbodies_NHD.shp"); crs(water)
+  #'  Identify large bodies of water (anything larger than 1 sq-km in size)
+  bigwater <- water[water$areasqkm > 1,]
+  bigwater_nad27 <- st_transform(bigwater, crs = nad27_12N)
   #' #'  Create a single LINESTRING for I40 and I10
   #' I40 <- filter(hwys, fullname == "I- 40") %>%
   #'   st_union()
@@ -172,12 +178,12 @@
     vect() %>%
     terra::buffer(width = 1000) %>%
     st_as_sf()
-  ggplot(exp_pop_sbb_defined) + geom_sf() + 
+  ggplot(exp_pop_wgs84) + geom_sf() + 
     geom_sf(data = dens, aes(color = Year), shape = 16) +
     geom_sf(data = homesite_buffers[homesite_buffers$Site_Type == "Den",], colour = "black", fill = NA) +
     coord_sf(xlim = c(-109.8417, -107.3039), ylim = c(33.0215, 34.2875), expand = FALSE) # exp_pop_sbb_defined
     #coord_sf(xlim = c(606823.5, 840562.3), ylim = c(3656509.8, 3798894.4), expand = FALSE) # exp_pop
-  ggplot(exp_pop_sbb_defined) + geom_sf() + 
+  ggplot(exp_pop_wgs84) + geom_sf() + 
     geom_sf(data = rnds, aes(color = Year), shape = 16) +
     geom_sf(data = homesite_buffers[homesite_buffers$Site_Type == "Rendezvous",], colour = "black", fill = NA) +
     coord_sf(xlim = c(-109.8417, -107.3039), ylim = c(33.0215, 34.2875), expand = FALSE) # exp_pop_sbb_defined
@@ -336,6 +342,13 @@
   #'  How much bigger is the buffered MCP compared to the original?
   st_area(homesite_mcp_buff)/st_area(homesite_mcp_sf)
   
+  #'  Mask out large waterbodies so not available when drawing random locations
+  homesite_mcp_buff_watermask <- st_difference(homesite_mcp_buff, st_union(bigwater_nad27))
+  
+  
+  #### MASK OUT LOW and HIGH ELEVATION AREA (CREATE A SHAPEFILE FIRST)  ####
+  
+  
   #'  Visualize (note the coordinate system!)
   #'  100% MCP and buffered MCP
   ggplot(homesite_mcp_buff) + geom_sf() + geom_sf(data = homesite_mcp_sf)
@@ -370,8 +383,8 @@
     #'  Set seed for reproducibility
     set.seed(108)
     
-    #'  Draw random sample of locations within the buffered MCP
-    rndpts <- st_sample(homesite_mcp_buff, size = navailable, type = "random", exact = TRUE) %>%
+    #'  Draw random sample of locations within the buffered MCP (excluding large waterbodies)
+    rndpts <- st_sample(homesite_mcp_buff_watermask, size = navailable, type = "random", exact = TRUE) %>%
       #'  Reformat to a normal sf object
       st_as_sf() %>%
       mutate(obs = seq(1:nrow(.))) %>%
