@@ -110,14 +110,10 @@
     }
   }	
   gaus_curv <- my_curves(dem, type = "gaussian")
+  plot(gaus_curv)
+  writeRaster(gaus_curv, "./Shapefiles/Terrain_variables/Gaussian_curvature.tif", overwrite = TRUE)
   
-  
-  
-  
-  
-  
-  
-  
+  # Converting Minar parameters to spatialEco parameters 
   # p = x
   # q = y
   # r = xx
@@ -131,10 +127,5 @@
   #'  of 0 indicate flat surface.
   profcurv <- curvature(dem, type = "profile")
   writeRaster(profcurv, "./Shapefiles/Terrain_variables/Profile_curvature.tif", overwrite = TRUE)
-  
-  #'  Total curvature: sigma of the profile and planform curvatures (planform is 
-  #'  perpendicular to direction of maximum slope)
-  totalcurv <- curvature(dem, type = "total")
-  writeRaster(totalcurv, "./Shapefiles/Terrain_variables/Total_curvature.tif", overwrite = TRUE)
   
   
