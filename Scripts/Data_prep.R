@@ -120,6 +120,7 @@
   }
   homesites_wgs84 <- spatial_locs(homesites, wgs84)
   homesites_nad27 <- spatial_locs(homesites, nad27_12N)
+  homesites_nad83 <- spatial_locs(homesites, nad83)
 
   #'  Save
   # st_write(homesites_wgs84[homesites_wgs84$Site_Type == "Den",], "./Shapefiles/Homesites/homesites_d.kml", driver = "kml", delete_dsn = TRUE)
@@ -147,6 +148,7 @@
   #'  This pair was released in the state of Chihuahua, Mexico so excluding from analyses
   homesites_wgs84_usa <- filter(homesites_wgs84, Pack != "Manada del Arroyo")
   homesites_nad27_usa <- st_transform(homesites_wgs84_usa, nad27_12N)
+  homesites_nad83_usa <- st_transform(homesites_wgs84_usa, nad83)
   
   #'  What's the min and max elevation (meters) of homesites? Using 30m res DEM
   homesite_elev <- terra::extract(elev, vect(homesites_wgs84_usa)) 
@@ -164,6 +166,10 @@
            ) %>%
     relocate(NewDen_SameYear, .after = Comments)
   rnds <- filter(homesites_wgs84_usa, Site_Type == "Rendezvous")
+  
+  #'  Unique packs
+  length(unique(dens$Pack))
+  length(unique(rnds$Pack))
   
   #'  Save pack-years with >1 den site
   multiple_dens <- filter(dens, NewDen_SameYear == "TRUE")
@@ -355,10 +361,12 @@
   #'  Den/rendezvous sites within buffered MCP and Zone 1 for context within Exp. Pop. Area
   ggplot(st_transform(exp_pop, nad27_12N)) + geom_sf() + geom_sf(data = homesite_mcp_buff, color = "red") + 
     geom_sf(data = homesite_mcp_sf, color = "blue") + geom_sf(data = st_transform(zone1, nad27_12N), fill = "gray25", alpha = 0.30) +
-    geom_sf(data = homesites_nad27[homesites_nad27$Site_Type == "Den",], aes(color = Year), shape = 16, size = 1.5) 
+    geom_sf(data = homesites_nad27_usa[homesites_nad27_usa$Site_Type == "Den",], aes(color = Year), shape = 16, size = 1.5) +
+    ggtitle("Mexican wolf den sites, 100% MCP, and buffered MCP")
   ggplot(st_transform(exp_pop, nad27_12N)) + geom_sf() + geom_sf(data = homesite_mcp_buff, color = "red") + 
     geom_sf(data = homesite_mcp_sf, color = "blue") + geom_sf(data = st_transform(zone1, nad27_12N), fill = "gray25", alpha = 0.30) +
-    geom_sf(data = homesites_nad27[homesites_nad27$Site_Type == "Rendezvous",], aes(color = Year), shape = 16, size = 1.5)
+    geom_sf(data = homesites_nad27_usa[homesites_nad27_usa$Site_Type == "Rendezvous",], aes(color = Year), shape = 16, size = 1.5) +
+    ggtitle("Mexican wolf rendezvous sites, 100% MCP, and buffered MCP")
   
   #' #'  Save as shapefile and kml
   #' homesite_mcp_buff_wgs84 <- st_transform(homesite_mcp_buff, wgs84); st_bbox(homesite_mcp_buff_wgs84)
@@ -421,7 +429,7 @@
   terrain_stack <- c(elev, slope, rough, curve) 
   ndvi_stack <- c(ndvi_den, ndvi_rnd) #water, 
   
-  #'  DON'T FOREGET TO LOAD WATERBODIES
+  #'  DON'T FORGET TO LOAD WATERBODIES
   #'  Identify large bodies of water (anything larger than 1 sq-km in size)
   bigwater <- waterbody[waterbody$AreSqKm > 1,]
   #'  Mask large bodies of water from raster
