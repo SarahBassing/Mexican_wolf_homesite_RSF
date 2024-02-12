@@ -352,7 +352,7 @@
   homesite_mcp_buff_watermask <- st_difference(homesite_mcp_buff, st_union(bigwater_nad27))
   
   
-  #### MASK OUT LOW and HIGH ELEVATION AREA (CREATE A SHAPEFILE FIRST)  ####
+  #### MASK OUT LOW ELEVATION OR UNSUITABLE HABITAT & URBAN CENTERS (CREATE A SHAPEFILE FIRST)  ####
   
   
   #'  Visualize (note the coordinate system!)
