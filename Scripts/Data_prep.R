@@ -34,9 +34,6 @@
   rough <- terra::rast("./Shapefiles/Terrain_variables/VRM.tif"); res(rough); crs(rough)
   curve <- terra::rast("./Shapefiles/Terrain_variables/Gaussian_curvature.tif"); res(curve); crs(curve)
   water <- terra::rast("./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water.tif"); res(water); crs(water)
-  ndvi_den <- terra::rast("./Shapefiles/Vegetation_variables/Mosaic_Avg_NDVI_Mar_June.tif"); res(ndvi_den); crs(ndvi_den)
-  ndvi_rnd <- terra::rast("./Shapefiles/Vegetation_variables/Mosaic_Avg_NDVI_June_Aug.tif"); res(ndvi_rnd); crs(ndvi_rnd)
-  ndvi_den0 <- terra::rast("./Shapefiles/Vegetation_variables/meanNDVI_den_2000.tif"); res(ndvi_den0); crs(ndvi_den0)
   
   #' #'  Empty raster to extract covariates for each pixel for predicting phase of study
   #' s <- elev
