@@ -69,6 +69,29 @@
   app(vrm, sd)
   plot(vrm)
   
+  #'  -------------------------------------------------------
+  ####  Martinez-Meyer et al. 2021 Habitat suitability data  ####
+  #'  -------------------------------------------------------
+  #'  Load data downloaded from https://datacommons.cyverse.org/browse/iplant/home/shared/commons_repo/curated/MartinezMeyer_et_al_DivDist_2021
+  #'  niche.txt = Climatic suitability raster
+  #'  human_population.txt = Human population density suitability raster
+  #'  road_density.txt = Road density suitability raster
+  niche <- terra::rast("./Shapefiles/Martinez_Meyer_2021_layers/niche.txt")
+  #'  Review raster details and visualize
+  niche
+  plot(niche)
+  
+  #'  Convert raster to polygon outlining spatial extent of suitable habitat
+  suitable_habitat <- as.polygons(niche)
+  suitable_habitat_sf <- st_as_sf(suitable_habitat)
+  plot(suitable_habitat_sf)
+  st_write(suitable_habitat_sf, "./Shapefiles/Martinez_Meyer_2021_layers/suitable_habitat.shp")
+  
+  
+  
+  
+  
+  
   #' #####  Surface curvatures  #####
   #' #'  ------------------------
   #' #'  Gaussian curvature and Profile curvature
