@@ -34,6 +34,7 @@
   rough <- terra::rast("./Shapefiles/Terrain_variables/VRM.tif"); res(rough); crs(rough)
   curve <- terra::rast("./Shapefiles/Terrain_variables/Gaussian_curvature.tif"); res(curve); crs(curve)
   water <- terra::rast("./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water.tif"); res(water); crs(water)
+  human_mod <- terra::rast("./Shapefiles/Human_variables/mosaic_global_Human_Modification.tif"); res(human_mod); crs(human_mod)
   
   #' #'  Empty raster to extract covariates for each pixel for predicting phase of study
   #' s <- elev
