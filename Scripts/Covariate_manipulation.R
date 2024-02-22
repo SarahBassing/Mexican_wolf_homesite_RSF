@@ -73,22 +73,41 @@
   ####  Martinez-Meyer et al. 2021 Habitat suitability data  ####
   #'  -------------------------------------------------------
   #'  Load data downloaded from https://datacommons.cyverse.org/browse/iplant/home/shared/commons_repo/curated/MartinezMeyer_et_al_DivDist_2021
+  #'  Raster extent represents the approximated historical distribution of Mexican 
+  #'  wolves based on climatically suitable areas 
   #'  niche.txt = Climatic suitability raster
-  #'  human_population.txt = Human population density suitability raster
-  #'  road_density.txt = Road density suitability raster
+  #'  human_population.txt = Human population density suitability raster (-1 to 1, 
+  #'  where -1 is most unsuitable, reflecting highest human densities in the region)
   niche <- terra::rast("./Shapefiles/Martinez_Meyer_2021_layers/niche.txt")
+  humans <- terra::rast("./Shapefiles/Martinez_Meyer_2021_layers/human_population.txt")
   #'  Review raster details and visualize
   niche
   plot(niche)
+  plot(humans)
   
-  #'  Convert raster to polygon outlining spatial extent of suitable habitat
-  suitable_habitat <- as.polygons(niche)
-  suitable_habitat_sf <- st_as_sf(suitable_habitat)
-  plot(suitable_habitat_sf)
-  st_write(suitable_habitat_sf, "./Shapefiles/Martinez_Meyer_2021_layers/suitable_habitat.shp")
+  #'  Convert rasters to polygons outlining spatial extent of suitable habitat features
+  suitable_niche <- as.polygons(niche)
+  suitable_niche_sf <- st_as_sf(suitable_niche)
+  human_pop <- as.polygons(humans)
+  human_pop_sf <- st_as_sf(human_pop)
   
+  #'  Visualize
+  plot(suitable_niche_sf)
+  plot(human_pop_sf)
+  #'  Focus on only area with low human densities
+  plot(human_pop_sf[human_pop_sf$human_population >0.5,])
+  low_human_pop <- human_pop_sf[human_pop_sf$human_population >0.5,]
+  plot(low_human_pop)
   
+  #'  Remove areas of high human density from suitable_niche polygon to create
+  #'  a final "suitable habitat" polygon 
+  suitable_low_ppl <- st_intersection(suitable_niche_sf, low_human_pop)
+  plot(suitable_low_ppl[1])
   
+  #'  Save
+  st_write(suitable_niche_sf, "./Shapefiles/Martinez_Meyer_2021_layers/suitable_climatic.shp")
+  st_write(low_human_pop, "./Shapefiles/Martinez_Meyer_2021_layers/low_human_density.shp")
+  st_write(suitable_low_ppl, "./Shapefiles/Martinez_Meyer_2021_layers/suitable_habitat.shp")
   
   
   
