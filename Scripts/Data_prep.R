@@ -48,17 +48,23 @@
   #'  Define WGS84 coordinate systems
   wgs84 <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
   
-  #'  Recovery zones
-  exp_pop <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/MWEPA Final.shp"); crs(exp_pop)
-  zone1 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_1.shp") %>% st_transform(wgs84)
-  zone2 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_2.shp") %>% st_transform(wgs84)
-  zone3 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_3.shp") %>% st_transform(wgs84)
-  exp_pop_wgs84 <- st_transform(exp_pop, wgs84)
-  crs(zone1); crs(exp_pop_wgs84)
+  #'  Recovery zones and suitable habitat (identified by Martinez-Meyer et al. 2021)
+  wmepa <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/MWEPA Final.shp"); crs(wmepa)
+  wmz1 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_1.shp") %>% st_transform(wgs84)
+  wmz2 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_2.shp") %>% st_transform(wgs84)
+  wmz3 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_3.shp") %>% st_transform(wgs84)
+  suitable_habitat <- st_read("./Shapefiles/Martinez_Meyer_2021_layers/suitable_habitat.shp") %>% st_transform(wgs84)
+  wmepa_wgs84 <- st_transform(wmepa, wgs84)
+  crs(wmz1); crs(wmepa_wgs84); crs(suitable_habitat)
   
   #'  Define NAD27 and NAD83 projected coordinate system
-  nad27_12N <- st_crs(exp_pop)
+  nad27_12N <- st_crs(wmepa)
   nad83 <- st_crs(elev)
+  
+  #'  Crop suitable habitat to experimental population area and reproject
+  wmepa_suitable <- st_intersection(wmepa_wgs84, suitable_habitat)
+  plot(wmepa_suitable[1])
+  wmepa_suitable_nad27 <- st_transform(wmepa_suitable, crs = nad27_12N)
   
   #'  State, highway, and waterbody shapefiles
   usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
@@ -85,27 +91,29 @@
   #' split_southwest$include <- factor(seq_len(nrow(split_southwest)))
   #' ggplot(split_southwest) + geom_sf(aes(fill = include))
   #' #'  Filter to SBB defined experimental population area and anything south of I40
-  #' exp_pop_sbb_defined <- filter(split_southwest, include == 2); st_crs(exp_pop_sbb_defined); st_bbox(exp_pop_sbb_defined)
+  #' wmepa_sbb_defined <- filter(split_southwest, include == 2); st_crs(wmepa_sbb_defined); st_bbox(wmepa_sbb_defined)
   #' southI40 <- filter(split_southwest, include != 1) %>% st_union(); st_crs(southI40); st_bbox(southI40)
-  #' ggplot(exp_pop_sbb_defined) + geom_sf();  ggplot(az_nm) + geom_sf() + geom_sf(data = southI40)
+  #' ggplot(wmepa_sbb_defined) + geom_sf();  ggplot(az_nm) + geom_sf() + geom_sf(data = southI40)
   
-  #'  Review each zones within context of larger experimental population area boundary
-  ggplot(exp_pop) + geom_sf() + geom_sf(data = zone1) #'  Recovery zone 1
-  ggplot(exp_pop) + geom_sf() + geom_sf(data = zone2) #'  Recovery zone 2
-  ggplot(exp_pop) + geom_sf() + geom_sf(data = zone3) #'  Recovery zone 3
+  #'  Review each zones & suitable habitat within context of larger experimental 
+  #'  population area boundary
+  ggplot(wmepa_wgs84) + geom_sf() + geom_sf(data = wmz1) #'  Recovery zone 1
+  ggplot(wmepa_wgs84) + geom_sf() + geom_sf(data = wmz2) #'  Recovery zone 2
+  ggplot(wmepa_wgs84) + geom_sf() + geom_sf(data = wmz3) #'  Recovery zone 3
+  ggplot(wmepa_wgs84) + geom_sf() + geom_sf(data = wmepa_suitable, fill = "blue") + geom_sf(data = wmz1, fill = "orange")
   
   #'  Recovery zone 1 bounding box
-  st_bbox(zone1)
-  zone1_bbox <- st_as_sfc(st_bbox(zone1))
-  zone1_extent_wgs84 <- st_transform(zone1_bbox, wgs84)
+  st_bbox(wmz1)
+  wmz1_bbox <- st_as_sfc(st_bbox(wmz1))
+  wmz1_extent_wgs84 <- st_transform(wmz1_bbox, wgs84)
   
   #'  Save select features
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.shp")
   # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.kml", driver = "kml", delete_dsn = TRUE)
-  # st_write(exp_pop_sbb_defined, "./Shapefiles/experimental_pop_poly.shp")
-  # st_write(exp_pop_wgs84, "./Shapefiles/experimental_pop_poly_wgs84.shp")
+  # st_write(wmepa_sbb_defined, "./Shapefiles/experimental_pop_poly.shp")
+  # st_write(wmepa_wgs84, "./Shapefiles/experimental_pop_poly_wgs84.shp")
   # st_write(southI40, "./Shapefiles/I40_south_poly.shp")
-  # st_write(zone1_extent_wgs84, "./Shapefiles/RecoveryZone1_bbox_wgs84.shp")
+  # st_write(wmz1_extent_wgs84, "./Shapefiles/Recoverywmz1_bbox_wgs84.shp")
   
   #'  Create a sf object for locations
   spatial_locs <- function(locs, proj) {
@@ -131,16 +139,16 @@
   ####  Explore & filter homesites  ####
   #'  ------------------------------
   #'  Visualize homesites within Recovery Zone 1
-  ggplot(zone1_bbox) + geom_sf() + geom_sf(data = zone1) + 
+  ggplot(wmz1_bbox) + geom_sf() + geom_sf(data = wmz1) + 
     geom_sf(data = homesites_wgs84[homesites_wgs84$Site_Type == "Den",], aes(color = Year), shape = 16, size = 3) 
-  ggplot(zone1_bbox) + geom_sf() + geom_sf(data = zone1) + 
+  ggplot(wmz1_bbox) + geom_sf() + geom_sf(data = wmz1) + 
     geom_sf(data = homesites_wgs84[homesites_wgs84$Site_Type == "Rendezvous",], aes(color = Year), shape = 16, size = 3) #+
     #' #'  Constrain plot to bbox of the experimental population area
     #' coord_sf(xlim = c(-114.53588, -103.04233), ylim = c(31.96210, 35.53438), expand = FALSE)
     
   #'  Which den site falls way outside experimental population area?
-  home_exp_intersection <- st_intersection(homesites_wgs84, exp_pop_wgs84)
-  ggplot(exp_pop_wgs84) + geom_sf() + geom_sf(data = hwys) + geom_sf(data = home_exp_intersection, aes(color = Year), shape = 16, size = 3)
+  home_exp_intersection <- st_intersection(homesites_wgs84, wmepa_wgs84)
+  ggplot(wmepa_wgs84) + geom_sf() + geom_sf(data = hwys) + geom_sf(data = home_exp_intersection, aes(color = Year), shape = 16, size = 3)
   far_away_home <- subset(homesites_wgs84, !(obs %in% home_exp_intersection$obs))
   #'  2023 den of the Manada del Arroyo pack
   #'  This pair was released in the state of Chihuahua, Mexico so excluding from analyses
@@ -182,16 +190,16 @@
     vect() %>%
     terra::buffer(width = 1000) %>%
     st_as_sf()
-  ggplot(exp_pop_wgs84) + geom_sf() + 
+  ggplot(wmepa_wgs84) + geom_sf() + 
     geom_sf(data = dens, aes(color = Year), shape = 16) +
     geom_sf(data = homesite_buffers[homesite_buffers$Site_Type == "Den",], colour = "black", fill = NA) +
-    coord_sf(xlim = c(-109.8417, -107.3039), ylim = c(33.0215, 34.2875), expand = FALSE) # exp_pop_sbb_defined
-    #coord_sf(xlim = c(606823.5, 840562.3), ylim = c(3656509.8, 3798894.4), expand = FALSE) # exp_pop
-  ggplot(exp_pop_wgs84) + geom_sf() + 
+    coord_sf(xlim = c(-109.8417, -107.3039), ylim = c(33.0215, 34.2875), expand = FALSE) # wmepa_sbb_defined
+    #coord_sf(xlim = c(606823.5, 840562.3), ylim = c(3656509.8, 3798894.4), expand = FALSE) # wmepa
+  ggplot(wmepa_wgs84) + geom_sf() + 
     geom_sf(data = rnds, aes(color = Year), shape = 16) +
     geom_sf(data = homesite_buffers[homesite_buffers$Site_Type == "Rendezvous",], colour = "black", fill = NA) +
-    coord_sf(xlim = c(-109.8417, -107.3039), ylim = c(33.0215, 34.2875), expand = FALSE) # exp_pop_sbb_defined
-    #coord_sf(xlim = c(606823.5, 840562.3), ylim = c(3656509.8, 3798894.4), expand = FALSE) # exp_pop
+    coord_sf(xlim = c(-109.8417, -107.3039), ylim = c(33.0215, 34.2875), expand = FALSE) # wmepa_sbb_defined
+    #coord_sf(xlim = c(606823.5, 840562.3), ylim = c(3656509.8, 3798894.4), expand = FALSE) # wmepa
     
   #'  Identify pairwise combinations of sites that are within 250m of each other
   close_sites <- function(sites) {
@@ -346,30 +354,35 @@
   #'  How much bigger is the buffered MCP compared to the original?
   st_area(homesite_mcp_buff)/st_area(homesite_mcp_sf)
   
-  #'  Mask out large waterbodies so not available when drawing random locations
+  #'  Mask out large water bodies so not available when drawing random locations
   homesite_mcp_buff_watermask <- st_difference(homesite_mcp_buff, st_union(bigwater_nad27))
+  plot(homesite_mcp_buff_watermask[1])
   
-  
-  #### MASK OUT LOW ELEVATION OR UNSUITABLE HABITAT & URBAN CENTERS (CREATE A SHAPEFILE FIRST)  ####
-  
+  #'  Mask out unsuitable habitat so not available
+  #'  First generate polygon of unsuitable habitat
+  homesite_mcp_buff_UNsuitablemask <- st_difference(homesite_mcp_buff, st_union(wmepa_suitable_nad27))
+  #'  Mask out unsuitable habitat from buffer with large water bodies already masked out
+  homesite_mcp_buff_suitablemask <- st_difference(homesite_mcp_buff_watermask, st_union(homesite_mcp_buff_UNsuitablemask))
+  plot(homesite_mcp_buff_suitablemask[1])
   
   #'  Visualize (note the coordinate system!)
   #'  100% MCP and buffered MCP
   ggplot(homesite_mcp_buff) + geom_sf() + geom_sf(data = homesite_mcp_sf)
-  #'  Den/rendezvous sites within buffered MCP and Zone 1 for context within Exp. Pop. Area
-  ggplot(st_transform(exp_pop, nad27_12N)) + geom_sf() + geom_sf(data = homesite_mcp_buff, color = "red") + 
-    geom_sf(data = homesite_mcp_sf, color = "blue") + geom_sf(data = st_transform(zone1, nad27_12N), fill = "gray25", alpha = 0.30) +
+  #'  Den/rendezvous sites within maksed & buffered MCP and Zone 1 for context within Exp. Pop. Area
+  ggplot(st_transform(wmepa, nad27_12N)) + geom_sf() + geom_sf(data = homesite_mcp_buff_suitablemask, color = "red") + 
+    geom_sf(data = homesite_mcp_sf, color = "blue") + geom_sf(data = st_transform(wmz1, nad27_12N), fill = "gray25", alpha = 0.30) +
     geom_sf(data = homesites_nad27_usa[homesites_nad27_usa$Site_Type == "Den",], aes(color = Year), shape = 16, size = 1.5) +
-    ggtitle("Mexican wolf den sites, 100% MCP, and buffered MCP")
-  ggplot(st_transform(exp_pop, nad27_12N)) + geom_sf() + geom_sf(data = homesite_mcp_buff, color = "red") + 
-    geom_sf(data = homesite_mcp_sf, color = "blue") + geom_sf(data = st_transform(zone1, nad27_12N), fill = "gray25", alpha = 0.30) +
+    ggtitle("Den sites, 100% MCP, and buffered MCP (excluding unsuitable habitat)")
+  ggplot(st_transform(wmepa, nad27_12N)) + geom_sf() + geom_sf(data = homesite_mcp_buff_suitablemask, color = "red") + 
+    geom_sf(data = homesite_mcp_sf, color = "blue") + geom_sf(data = st_transform(wmz1, nad27_12N), fill = "gray25", alpha = 0.30) +
     geom_sf(data = homesites_nad27_usa[homesites_nad27_usa$Site_Type == "Rendezvous",], aes(color = Year), shape = 16, size = 1.5) +
-    ggtitle("Mexican wolf rendezvous sites, 100% MCP, and buffered MCP")
+    ggtitle("Rendezvous sites, 100% MCP, and suitable buffered MCP \n(excluding unsuitable habitat)")
   
   #' #'  Save as shapefile and kml
   #' homesite_mcp_buff_wgs84 <- st_transform(homesite_mcp_buff, wgs84); st_bbox(homesite_mcp_buff_wgs84)
   #' st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.shp")
   #' st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.kml", driver = "kml", delete_dsn = TRUE)
+  #' st_write(homesite_mcp_buff_suitablemask, "./Shapefiles/Homesites/Homesite_buffered_MCP_suitableHabitat.shp")
   
   #'  Number of available locations to generate per used location 
   avail_pts <- 1000
@@ -390,7 +403,7 @@
     set.seed(108)
     
     #'  Draw random sample of locations within the buffered MCP (excluding large waterbodies)
-    rndpts <- st_sample(homesite_mcp_buff_watermask, size = navailable, type = "random", exact = TRUE) %>%
+    rndpts <- st_sample(homesite_mcp_buff_suitablemask, size = navailable, type = "random", exact = TRUE) %>%
       #'  Reformat to a normal sf object
       st_as_sf() %>%
       mutate(obs = seq(1:nrow(.))) %>%
@@ -398,9 +411,9 @@
       rename(geometry = x)
     
     #'  Plot available points within buffered MCP
-    avail_locs_plot <- ggplot(exp_pop) + geom_sf() + 
-      geom_sf(data = homesite_mcp_buff, color = "red") + 
-      geom_sf(data = zone1, fill = "gray25", alpha = 0.30) +
+    avail_locs_plot <- ggplot(wmepa) + geom_sf() + 
+      geom_sf(data = homesite_mcp_buff, color = "red", size = 1.2) + 
+      geom_sf(data = wmz1, fill = "gray25", alpha = 0.30) +
       geom_sf(data = rndpts, shape = 16, size = 0.5, color = "blue") 
     plot(avail_locs_plot)
   
@@ -425,17 +438,11 @@
   #'  ---------------------
   #'  Create raster stacks of all relevant covariates (must be same grid & res)
   terrain_stack <- c(elev, slope, rough, curve) 
-  ndvi_stack <- c(ndvi_den, ndvi_rnd) #water, 
-  
-  #'  DON'T FORGET TO LOAD WATERBODIES
-  #'  Identify large bodies of water (anything larger than 1 sq-km in size)
-  bigwater <- waterbody[waterbody$AreSqKm > 1,]
-  #'  Mask large bodies of water from raster
-  grid_mask <- mask(s, bigwater, inverse = TRUE)
+  # ndvi_stack <- c(ndvi_den, ndvi_rnd) #water, 
   
   #'  Extract covariate values at each used and available location
   get_covs <- function(locs) {
-    tst <- terra::extract(locs, terrain_stack)
+    terrain_covs <- terra::extract(locs, terrain_stack)
   }
   
   
