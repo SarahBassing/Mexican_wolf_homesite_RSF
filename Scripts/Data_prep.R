@@ -35,6 +35,7 @@
   curve <- terra::rast("./Shapefiles/Terrain_variables/Gaussian_curvature.tif"); res(curve); crs(curve)
   water <- terra::rast("./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water.tif"); res(water); crs(water)
   human_mod <- terra::rast("./Shapefiles/Human_variables/mosaic_global_Human_Modification.tif"); res(human_mod); crs(human_mod)
+  roads <- terra::rast("./Shapefiles/Human_variables/mosaic_dist2road.tif"); res(roads); crs(roads)
   
   #' #'  Empty raster to extract covariates for each pixel for predicting phase of study
   #' s <- elev
@@ -75,9 +76,9 @@
   #'  Merge into single "southwest" polygon
   southwest <- st_union(az_nm[az_nm$NAME == "Arizona",], az_nm[az_nm$NAME == "New Mexico",]) %>%
     st_cast("POLYGON")
-  water <- st_read("./Shapefiles/National Hydrography Dataset (NHD)/AZ_NM_waterbodies_NHD.shp"); crs(water)
+  waterbodies <- st_read("./Shapefiles/National Hydrography Dataset (NHD)/AZ_NM_waterbodies_NHD.shp"); crs(waterbodies)
   #'  Identify large bodies of water (anything larger than 1 sq-km in size)
-  bigwater <- water[water$areasqkm > 1,]
+  bigwater <- waterbodies[waterbodies$areasqkm > 1,]
   bigwater_nad27 <- st_transform(bigwater, crs = nad27_12N)
   #' #'  Create a single LINESTRING for I40 and I10
   #' I40 <- filter(hwys, fullname == "I- 40") %>%
@@ -327,14 +328,14 @@
       ungroup()
     return(site_random_sample)
   }
-  den_sample <- reduce_sites(den_weights)
+  den_sample <- reduce_sites(den_weights) %>%
+    dplyr::select(-NewDen_SameYear)
   rnd_sample <- reduce_sites(rnd_weights)
 
   #'  Merge sampled den and rendezvous sites into single df
-  used_homesites <- den_sample %>%
-    dplyr::select(-NewDen_SameYear) %>%
-    bind_rows(rnd_sample)
+  used_homesites <- den_sample %>% bind_rows(rnd_sample)
   used_homesites_nad27 <- st_transform(used_homesites, nad27_12N)
+  used_homesites_nad83 <- st_transform(used_homesites, nad83)
 
   #'  --------------------------------
   ####  Generate available locations  ####
@@ -389,7 +390,7 @@
   avail_pts <- 1000
   
   #'  Function to generate random available locations based on number of used locations
-  sample_avail_locs <- function(locs, newcrs, navail) {
+  sample_avail_locs <- function(locs, newcrs, navail, seed, sitetype) {
     #'  Reproject locations
     locs <- st_transform(locs, newcrs)
     
@@ -400,16 +401,26 @@
     #'  Total number of available locations to generate
     navailable <- nused * navail
     
+    #'  Sequence of pack_year repeated avail_pts times
+    #'  (need to know which available points correspond to each site)
+    navailable_packyear <- as.vector(rep(locs$Pack_year, each = avail_pts))
+     
     #'  Set seed for reproducibility
-    set.seed(108)
+    set.seed(seed)
     
     #'  Draw random sample of locations within the buffered MCP (excluding large waterbodies)
     rndpts <- st_sample(homesite_mcp_buff_suitablemask, size = navailable, type = "random", exact = TRUE) %>%
       #'  Reformat to a normal sf object
       st_as_sf() %>%
-      mutate(obs = seq(1:nrow(.))) %>%
-      relocate(obs, .before = x) %>%
+      mutate(obs = seq(1:nrow(.)),
+             Site_Type = sitetype,
+             used = 0) %>%
+      bind_cols(navailable_packyear) %>%
+      relocate(x, .after = last_col()) %>%
+      relocate(used, .after = x) %>%
+      relocate(Site_Type, .before = used) %>%
       rename(geometry = x)
+    names(rndpts) <- c("obs", "Pack_year", "Site_Type", "used", "geometry")
     
     #'  Plot available points within buffered MCP
     avail_locs_plot <- ggplot(wmepa) + geom_sf() + 
@@ -420,32 +431,92 @@
   
     return(rndpts)
   }
-  avail_locs_den <- sample_avail_locs(den_sample, newcrs = nad27_12N, navail = avail_pts)
-  avail_locs_rnd <- sample_avail_locs(rnd_sample, newcrs = nad27_12N, navail = avail_pts)
+  avail_locs_den <- sample_avail_locs(den_sample, newcrs = nad27_12N, navail = avail_pts, seed = 108, sitetype = "Den")
+  avail_locs_rnd <- sample_avail_locs(rnd_sample, newcrs = nad27_12N, navail = avail_pts, seed = 211, sitetype = "Rendezvous")
   
   #'  Reproject available locations
+  avail_locs_den_nad83 <- st_transform(avail_locs_den, nad83)
   avail_locs_den_wgs84 <- st_transform(avail_locs_den, wgs84)
+  avail_locs_rnd_nad83 <- st_transform(avail_locs_rnd, nad83)
   avail_locs_rnd_wgs84 <- st_transform(avail_locs_rnd, wgs84)
   
   #'  Save available locations
-  # st_write(avail_locs_den_wgs84, "./Shapefiles/Homesites/Available_locations_den.shp")
-  # st_write(avail_locs_den_wgs84, "./Shapefiles/Homesites/Available_locations_den.kml", driver = "kml", delete_dsn = TRUE)
-  # st_write(avail_locs_rnd_wgs84, "./Shapefiles/Homesites/Available_locations_rnd.shp")
-  # st_write(avail_locs_rnd_wgs84, "./Shapefiles/Homesites/Available_locations_rnd.kml", driver = "kml", delete_dsn = TRUE)
+  st_write(avail_locs_den_wgs84, "./Shapefiles/Homesites/Available_locations_den.shp")
+  st_write(avail_locs_rnd_wgs84, "./Shapefiles/Homesites/Available_locations_rnd.shp")
   
+  #'  Combine used and available locations per homesite type 
+  all_locs <- function(used, avail) {
+    #'  Add "used" classification to used locations
+    used_and_avail <- used %>%
+      mutate(used = 1) %>%
+      dplyr::select(-c(cluster_id, n, wgts, Year, Pack, Comments)) %>%
+      #'  Bind available locations to the used sites
+      bind_rows(avail) %>%
+      #'  Reogranize so all used & available locations per pack_year are sequential
+      arrange(Pack_year) %>%
+      #'  Renumber all used and available locations sequentially
+      mutate("ID" = seq(1:nrow(.))) %>%
+      relocate(used, .after = "Site_Type") %>%
+      relocate(ID, .before = obs) %>%
+      dplyr::select(-obs)
+    return(used_and_avail)
+  }
+  den_locs_wgs84 <- all_locs(den_sample, avail = avail_locs_den_wgs84) 
+  rnd_locs_wgs84 <- all_locs(rnd_sample, avail = avail_locs_rnd_wgs84)
+  
+  #'  Transform projection for covariate extraction
+  den_locs_nad83 <- st_transform(den_locs_wgs84, nad83)
+  rnd_locs_nad83 <- st_transform(rnd_locs_wgs84, nad83)
+  
+  #'  Save all locations
+  st_write(den_locs_wgs84, "./Shapefiles/Homesites/Used_Available_locations_den.shp")
+  st_write(rnd_locs_wgs84, "./Shapefiles/Homesites/Used_Available_locations_rnd.shp")
   
   #'  ---------------------
   ####  Gather covariates  ####
   #'  ---------------------
-  #'  Create raster stacks of all relevant covariates (must be same grid & res)
+  #'  Create raster stack of all terrain covariates (must be same grid & res)
   terrain_stack <- c(elev, slope, rough, curve) 
-  # ndvi_stack <- c(ndvi_den, ndvi_rnd) #water, 
   
   #'  Extract covariate values at each used and available location
-  get_covs <- function(locs) {
-    terrain_covs <- terra::extract(locs, terrain_stack)
+  get_covs <- function(locs_nad83, locs_wgs84) {
+    #'  Extract covariate values at each location (use correct projections!)
+    terrain <- terra::extract(terrain_stack, locs_nad83) 
+    names(terrain) <- c("ID", "Elevation_m", "Slope_degrees", "Roughness_VRM", "Gaussian_curvature")
+    rds <- terra::extract(roads, locs_nad83) %>% rename("Nearest_road_m" = "mosaic_dist2road")
+    gHM <- terra::extract(human_mod, locs_nad83) %>% rename("Human_mod_index" = "mosaic_global_Human_Modification")
+    h20 <- terra::extract(water, locs_wgs84) %>% rename("Nearest_water_m" = "Mosaic_Dist2Water")
+    
+    #'  Grab homesite info
+    homesite <- locs_wgs84 %>%
+      dplyr::select(c("Pack_year", "Site_Type", "used")) %>%
+      rename("Homesite" = "Site_Type") %>%
+      mutate(ID = seq(1:nrow(.))) %>%
+      relocate(ID, .before = "Pack_year")
+    
+    #'  Combine homesite info and covariates into single data frame
+    df <- full_join(homesite, terrain, by = "ID") %>%
+      full_join(h20, by = "ID") %>%
+      full_join(gHM, by = "ID") %>%
+      full_join(rds, by = "ID")
+    
+    #'  Review data
+    print(summary(df))
+    
+    return(df)
   }
+  all_data_den <- get_covs(den_locs_nad83, locs_wgs84 = den_locs_wgs84)
+  all_data_rnd <- get_covs(rnd_locs_nad83, locs_wgs84 = rnd_locs_wgs84)
   
+  #'  Save covariate data for all used and available locations
+  st_write(all_data_den, "./Shapefiles/Homesites/Covariate_data_den.shp")
+  st_write(all_data_rnd, "./Shapefiles/Homesites/Covariate_data_rnd.shp")
   
+  #'  Explore covaraite data
+  hist(all_data_den$Elevation_m[all_data_den$used == 1])
+  hist(all_data_den$Elevation_m[all_data_den$used == 0])
+  
+  hist(log(all_data_den$Nearest_road_m[all_data_den$used == 1]))
+  hist(log(all_data_den$Nearest_road_m[all_data_den$used == 0]))
   
   
