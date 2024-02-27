@@ -2,7 +2,7 @@
   #'  Sensitivity analysis for used:available ratio
   #'  Mexican wolf project
   #'  Sarah B. Bassing
-  #'  December 2023
+  #'  Februrary 2024
   #'  ----------------------
   #'  Randomly sample available points into different use:available ratios and run
   #'  model to identify the ratio at which slope coefficients asymptope
@@ -12,7 +12,6 @@
   rm(list =ls())
   
   #'  Load packages
-  library(lme4)
   library(purrr)
   library(ggplot2)
   library(tidyverse)
@@ -50,11 +49,11 @@
                 Slope = scale(as.numeric(Slope_degrees)),
                 Rough = scale(as.numeric(Roughness_VRM)),
                 Curve = scale(as.numeric(Gaussian_curvature)),
-                NearWater = scale(as.numeric(Nearest_water_m)),
-                logNearWater = scale(log(as.numeric(Nearest_water_m))),
+                Dist2Water = scale(as.numeric(Nearest_water_m)),
+                logDist2Water = scale(log(as.numeric(Nearest_water_m))),
                 HumanMod = scale(as.numeric(Human_mod_index)),
-                NearRoad = scale(as.numeric(Nearest_road_m)),
-                logNearRoad = scale(log(as.numeric(Nearest_road_m))))
+                Dist2Road = scale(as.numeric(Nearest_road_m)),
+                logDist2Road = scale(log(as.numeric(Nearest_road_m))))
     
     #'  Assess correlation among all scaled variables
     covs <- full_dat_z %>%
@@ -85,7 +84,7 @@
   
   #'  Fit basic den model
   fit_den_rsf <- function(dat){
-    mod <- lm(used ~ Elev + Slope + logNearWater, weight = wgts, data = dat, family = bimomial(link = "logit"))
+    mod <- glm(used ~ Elev + Slope + logDist2Water, weight = wgts, data = dat, family = binomial)
     return(mod)
   }
   den_1_2_mod <- lapply(den_1_2_ratio, fit_den_rsf); summary(den_1_2_mod[[1]]); car::vif(den_1_2_mod[[1]])
@@ -168,7 +167,7 @@
     #'  Slope parameter #3
     plot_water <- ggplot(df[df$Parameter == "logNearWater",], aes(factor(nAvailable), y = Estimate)) +
       geom_boxplot() + ggtitle("Log of the Distance to nearest waterbody") + theme_light() + 
-      ggtitle("Intercept") + labs(x = "Number of available locations", y = "Average coefficient estimate") 
+      labs(x = "Number of available locations", y = "Average coefficient estimate") 
     plot(plot_water)
   }
   den_coef_boxplots <- boxplot_den_dat(den_coefs)
