@@ -20,9 +20,9 @@
   library(adehabitatHR)
   library(tidyverse)
   
-  #'  -------------
-  ####  Load data  ####
-  #'  -------------
+  #'  ------------------------
+  ####  Load and format data  ####
+  #'  ------------------------
   #'  Used locations
   homesites <- read_csv("./Data/MexWolf_dens_rend_sites_1998_2023_updated_01.19.24.csv") %>%
     mutate(Pack_year = paste0(Pack, "_", Year)) %>%
@@ -179,7 +179,10 @@
   length(unique(dens$Pack))
   length(unique(rnds$Pack))
   
-  #'  Save pack-years with >1 den site
+  #'  ---------------------------------
+  ##### Group and rarify repeat sites  ####
+  #'  ---------------------------------
+  #'  Pack-years with >1 den site
   multiple_dens <- filter(dens, NewDen_SameYear == "TRUE")
   den_moves <- subset(homesites, (Pack_year %in% multiple_dens$Pack_year)) %>%
     filter(Site_Type == "Den")
@@ -340,6 +343,8 @@
   #'  --------------------------------
   ####  Generate available locations  ####
   #'  --------------------------------
+  #####  Create buffered sampling extent  #####
+  #'  ------------------------------------
   #'  Define extent of "available" habitat for wolves to den/rendezvous in
   #'  Create single MCP that includes den and rendezvous sites
   #'  NOTE the coordinate sytem - buffer is smoother in projected coord system
@@ -380,17 +385,20 @@
     geom_sf(data = homesites_nad27_usa[homesites_nad27_usa$Site_Type == "Rendezvous",], aes(color = Year), shape = 16, size = 1.5) +
     ggtitle("Rendezvous sites, 100% MCP, and suitable buffered MCP \n(excluding unsuitable habitat)")
   
-  #' #'  Save as shapefile and kml
-  #' homesite_mcp_buff_wgs84 <- st_transform(homesite_mcp_buff, wgs84); st_bbox(homesite_mcp_buff_wgs84)
-  #' st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.shp")
-  #' st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.kml", driver = "kml", delete_dsn = TRUE)
-  #' st_write(homesite_mcp_buff_suitablemask, "./Shapefiles/Homesites/Homesite_buffered_MCP_suitableHabitat.shp")
+  #'  Save as shapefiles
+  homesite_mcp_buff_wgs84 <- st_transform(homesite_mcp_buff, wgs84); st_bbox(homesite_mcp_buff_wgs84)
+  homesite_mcp_buff_suitablemask_wgs84 <- st_transform(homesite_mcp_buff_suitablemask, wgs84); st_bbox(homesite_mcp_buff_suitablemask_wgs84)
+  st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.shp")
+  st_write(homesite_mcp_buff_suitablemask, "./Shapefiles/Homesites/Homesite_buffered_MCP_suitableHabitat.shp")
   
+  #'  ------------------------------------------------
+  #####  Generate random points within buffered area  #####
+  #'  ------------------------------------------------
   #'  Number of available locations to generate per used location 
   #'  Drew 1000 to use for sensitivity analysis
   #avail_pts <- 1000
-  #'  Drew 200 to use for final analsyes based on results of sensitivity analysis
-  avail_pts <- 200
+  #'  Drew 100 to use for final analyses based on results of sensitivity analysis
+  avail_pts <- 100
   
   #'  Function to generate random available locations based on number of used locations
   sample_avail_locs <- function(locs, newcrs, navail, seed, sitetype) {
@@ -522,12 +530,14 @@
   st_write(all_data_den, "./Data/all_data_den.csv")
   st_write(all_data_rnd, "./Data/all_data_rnd.csv")
   
-  ####  Explore covaraite data  ####
+  #'  -----------------------
+  #####  Explore covaraites  #####
+  #'  -----------------------
   #'  Compare spread of covaraite values between use and available locations
   all_data_den <- mutate(all_data_den, used = ifelse(used == 0, "available", "used"))
   all_data_rnd <- mutate(all_data_rnd, used = ifelse(used == 0, "available", "used"))
   
-  #####  Den site histograms  #####
+  ######  Den site histograms  ######
   ggplot(all_data_den, aes(x = Elevation_m, color = used, fill = used)) + 
     geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
     labs(title = "Used vs Available Locations", x = "Elevation m", y = "Frequency") + 
@@ -578,7 +588,7 @@
     geom_vline(xintercept = mean(log(all_data_den$Nearest_water_m[all_data_den$used == "used"])), linetype = "dashed", color = "#d95f02") +
     geom_vline(xintercept = mean(log(all_data_den$Nearest_water_m[all_data_den$used == "available"])), linetype = "dashed", color = "#7570b3")
   
-  #####  Rendezvous site histograms  #####
+  ######  Rendezvous site histograms  ######
   ggplot(all_data_rnd, aes(x = Elevation_m, color = used, fill = used)) + 
     geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
     labs(title = "Used vs Available Locations", x = "Elevation m", y = "Frequency") + 
