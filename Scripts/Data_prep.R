@@ -414,13 +414,17 @@
       st_as_sf() %>%
       mutate(obs = seq(1:nrow(.)),
              Site_Type = sitetype,
-             used = 0) %>%
+             used = 0,
+             #'  Add weights to used/available locations (used = 1, available = 5000 
+             #'  per Fieberg et al. 2021)
+             wgts = 5000) %>%
       bind_cols(navailable_packyear) %>%
       relocate(x, .after = last_col()) %>%
       relocate(used, .after = x) %>%
       relocate(Site_Type, .before = used) %>%
+      relocate(wgts, .after = used) %>%
       rename(geometry = x)
-    names(rndpts) <- c("obs", "Pack_year", "Site_Type", "used", "geometry")
+    names(rndpts) <- c("obs", "Pack_year", "Site_Type", "used", "wgts", "geometry")
     
     #'  Plot available points within buffered MCP
     avail_locs_plot <- ggplot(wmepa) + geom_sf() + 
@@ -448,8 +452,11 @@
   all_locs <- function(used, avail) {
     #'  Add "used" classification to used locations
     used_and_avail <- used %>%
-      mutate(used = 1) %>%
-      dplyr::select(-c(cluster_id, n, wgts, Year, Pack, Comments)) %>%
+      mutate(used = 1,
+             #'  Add weights to used/available locations (used = 1, available = 5000 
+             #'  per Fieberg et al. 2021)
+             wgts = 1) %>%
+      dplyr::select(-c(cluster_id, n, Year, Pack, Comments)) %>%
       #'  Bind available locations to the used sites
       bind_rows(avail) %>%
       #'  Reogranize so all used & available locations per pack_year are sequential
@@ -489,7 +496,7 @@
     
     #'  Grab homesite info
     homesite <- locs_wgs84 %>%
-      dplyr::select(c("Pack_year", "Site_Type", "used")) %>%
+      dplyr::select(c("Pack_year", "Site_Type", "used", "wgts")) %>%
       rename("Homesite" = "Site_Type") %>%
       mutate(ID = seq(1:nrow(.))) %>%
       relocate(ID, .before = "Pack_year")
