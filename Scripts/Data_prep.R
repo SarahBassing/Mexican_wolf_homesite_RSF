@@ -509,14 +509,115 @@
   all_data_rnd <- get_covs(rnd_locs_nad83, locs_wgs84 = rnd_locs_wgs84)
   
   #'  Save covariate data for all used and available locations
-  st_write(all_data_den, "./Shapefiles/Homesites/Covariate_data_den.shp")
-  st_write(all_data_rnd, "./Shapefiles/Homesites/Covariate_data_rnd.shp")
+  st_write(all_data_den, "./Data/all_data_den.csv")
+  st_write(all_data_rnd, "./Data/all_data_rnd.csv")
   
-  #'  Explore covaraite data
-  hist(all_data_den$Elevation_m[all_data_den$used == 1])
-  hist(all_data_den$Elevation_m[all_data_den$used == 0])
+  ####  Explore covaraite data  ####
+  #'  Compare spread of covaraite values between use and available locations
+  all_data_den <- mutate(all_data_den, used = ifelse(used == 0, "available", "used"))
+  all_data_rnd <- mutate(all_data_rnd, used = ifelse(used == 0, "available", "used"))
   
-  hist(log(all_data_den$Nearest_road_m[all_data_den$used == 1]))
-  hist(log(all_data_den$Nearest_road_m[all_data_den$used == 0]))
+  #####  Den site histograms  #####
+  ggplot(all_data_den, aes(x = Elevation_m, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Elevation m", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
+    geom_vline(xintercept = mean(all_data_den$Elevation_m[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_den$Elevation_m[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_den, aes(x = Slope_degrees, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Slope", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
+    geom_vline(xintercept = mean(all_data_den$Slope_degrees[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_den$Slope_degrees[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_den, aes(x = Roughness_VRM, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Roughness (VRM)", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
+    geom_vline(xintercept = mean(all_data_den$Roughness_VRM[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_den$Roughness_VRM[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_den, aes(x = Gaussian_curvature, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Curvature", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
+    geom_vline(xintercept = mean(all_data_den$Gaussian_curvature[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_den$Gaussian_curvature[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_den, aes(x = log(Nearest_road_m), color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Log of distance to nearest road (m)", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
+    geom_vline(xintercept = mean(log(all_data_den$Nearest_road_m[all_data_den$used == "used"])), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(log(all_data_den$Nearest_road_m[all_data_den$used == "available"])), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_den, aes(x = Human_mod_index, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Human modification", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
+    geom_vline(xintercept = mean(all_data_den$Human_mod_index[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_den$Human_mod_index[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_den, aes(x = log(Nearest_water_m), color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Log of distance to nearest water (m)", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
+    geom_vline(xintercept = mean(log(all_data_den$Nearest_water_m[all_data_den$used == "used"])), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(log(all_data_den$Nearest_water_m[all_data_den$used == "available"])), linetype = "dashed", color = "#7570b3")
+  
+  #####  Rendezvous site histograms  #####
+  ggplot(all_data_rnd, aes(x = Elevation_m, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Elevation m", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
+    geom_vline(xintercept = mean(all_data_rnd$Elevation_m[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_rnd$Elevation_m[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_rnd, aes(x = Slope_degrees, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Slope", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
+    geom_vline(xintercept = mean(all_data_rnd$Slope_degrees[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_rnd$Slope_degrees[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_rnd, aes(x = Roughness_VRM, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Roughness (VRM)", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
+    geom_vline(xintercept = mean(all_data_rnd$Roughness_VRM[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_rnd$Roughness_VRM[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_rnd, aes(x = Gaussian_curvature, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Curvature", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
+    geom_vline(xintercept = mean(all_data_rnd$Gaussian_curvature[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_rnd$Gaussian_curvature[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_rnd, aes(x = log(Nearest_road_m), color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Log of distance to nearest road (m)", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
+    geom_vline(xintercept = mean(log(all_data_rnd$Nearest_road_m[all_data_rnd$used == "used"])), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(log(all_data_rnd$Nearest_road_m[all_data_rnd$used == "available"])), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_rnd, aes(x = Human_mod_index, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Human modification", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
+    geom_vline(xintercept = mean(all_data_rnd$Human_mod_index[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_rnd$Human_mod_index[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_rnd, aes(x = log(Nearest_water_m), color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Log of distance to nearest water (m)", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
+    geom_vline(xintercept = mean(log(all_data_rnd$Nearest_water_m[all_data_rnd$used == "used"])), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(log(all_data_rnd$Nearest_water_m[all_data_rnd$used == "available"])), linetype = "dashed", color = "#7570b3")
+  
   
   
