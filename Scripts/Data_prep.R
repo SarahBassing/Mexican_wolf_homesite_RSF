@@ -387,7 +387,10 @@
   #' st_write(homesite_mcp_buff_suitablemask, "./Shapefiles/Homesites/Homesite_buffered_MCP_suitableHabitat.shp")
   
   #'  Number of available locations to generate per used location 
-  avail_pts <- 1000
+  #'  Drew 1000 to use for sensitivity analysis
+  #avail_pts <- 1000
+  #'  Drew 200 to use for final analsyes based on results of sensitivity analysis
+  avail_pts <- 200
   
   #'  Function to generate random available locations based on number of used locations
   sample_avail_locs <- function(locs, newcrs, navail, seed, sitetype) {
@@ -444,7 +447,7 @@
   avail_locs_rnd_nad83 <- st_transform(avail_locs_rnd, nad83)
   avail_locs_rnd_wgs84 <- st_transform(avail_locs_rnd, wgs84)
   
-  #'  Save available locations
+  #'  Save available locations 
   st_write(avail_locs_den_wgs84, "./Shapefiles/Homesites/Available_locations_den.shp")
   st_write(avail_locs_rnd_wgs84, "./Shapefiles/Homesites/Available_locations_rnd.shp")
   
