@@ -18,8 +18,8 @@
   library(tidyverse)
   
   #'  Load data
-  data_den <- st_read("./Data/all_data_den.csv")
-  data_rnd <- st_read("./Data/all_data_rnd.csv")
+  data_den <- st_read("./Data/all_data_den_1to1000ratio.csv")
+  data_rnd <- st_read("./Data/all_data_rnd_1to1000ratio.csv")
   
   #'  Sub-sample data sets to fewer available locations (2, 10, 20, 50, 100, 200, 500) 
   #'  to evaluate the point at which estimated slope coefficients stabilize
