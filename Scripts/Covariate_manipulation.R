@@ -109,7 +109,89 @@
   st_write(low_human_pop, "./Shapefiles/Martinez_Meyer_2021_layers/low_human_density.shp")
   st_write(suitable_low_ppl, "./Shapefiles/Martinez_Meyer_2021_layers/suitable_habitat.shp")
   
+  #'  -------------------------------------
+  ####  Exported Google Earth Engine data  ####
+  #'  -------------------------------------
+  #'  Global forest change data set to estimate annual canopy cover (Hansen Global Forest Change v1.10 (2000-2022))
+  #'  NDVI data set to estimate mean seasonal greenness (MOD13Q1.061 Terra Vegetation Indices 16-Day Global 250m)
   
+  #####  Annual canopy cover  ##### 
+  #'  ------------------------
+  #'  Average 2000 canopy cover within 250 of each location (used & available)
+  mean_canopy_den <- read_csv("./Data/GEE_meanCanopyCover_2000_den.csv") %>%
+    dplyr::select(c(ID, Pack_year, Site_Type, mean, used)) %>%
+    arrange(ID) %>%
+    rename("Mean_canopy_cover_2000" = "mean")
+  mean_canopy_rnd <- read_csv("./Data/GEE_meanCanopyCover_2000_rnd.csv") %>%
+    dplyr::select(c(ID, Pack_year, Site_Type, mean, used)) %>%
+    arrange(ID) %>%
+    rename("Mean_canopy_cover_2000" = "mean")
+  
+  #'  Sum of area (sq. m) of canopy loss over time within 250m of each location
+  canopy_loss_den <- read_csv("./Data/GEE_accumulated_canopy_loss_area_den.csv") %>%
+    dplyr::select(c(ID, Pack_year, used, BufferArea_sq_m, CanopyLossArea_sq_m, Year_add1)) %>%
+    group_by(Pack_year, Year_add1) %>%
+    arrange(ID, .by_group = TRUE) %>%
+    mutate(Year = Year_add1 + 2001,
+           LossYear = paste0("lossYr_", Year)) %>%
+    ungroup() %>%
+    dplyr::select(-Year_add1) 
+  canopy_loss_rnd <- read_csv("./Data/GEE_accumulated_canopy_loss_area_rnd.csv") %>%
+    dplyr::select(c(ID, Pack_year, used, BufferArea_sq_m, CanopyLossArea_sq_m, Year_add1))  %>%
+    group_by(Pack_year, Year_add1) %>%
+    arrange(ID, .by_group = TRUE) %>%
+    mutate(Year = Year_add1 + 2001,
+           LossYear = paste0("lossYr_", Year)) %>%
+    ungroup() %>%
+    dplyr::select(-Year_add1) 
+
+  #'  Brief look
+  head(mean_canopy_den); head(canopy_loss_den)
+  
+  #'  Reformat and update canopy cover based on years when canopy loss occurred
+  canopy_loss_den_reformat <- canopy_loss_den %>%
+    #'  Each column represents area (sq. m) of canopy loss as it accumulates across years
+    pivot_wider(!Year, names_from = LossYear, values_from = CanopyLossArea_sq_m) %>%
+    #'  Join with mean canopy cover from 2000
+    full_join(mean_canopy_den, by = c("ID", "Pack_year", "used")) %>%
+    relocate(Site_Type, .after = Pack_year) %>%
+    relocate(Mean_canopy_cover_2000, .after = used) %>%
+    #'  Put mean % canopy cover in a real percentage
+    mutate(Mean_2000_CC_percent = Mean_canopy_cover_2000 /100,
+           #'  Calculate proportion of area within buffer that was lost over time
+           across(lossYr_2001:lossYr_2022, function(x)(x/BufferArea_sq_m)),
+           #'  Calculate percent of area in buffer lost as it accumulates over time
+           across(lossYr_2001:lossYr_2022, function(x)(x * Mean_2000_CC_percent)),
+           #'  Adjust mean % canopy cover from 2000 by percentage of area lost across years
+           across(lossYr_2001:lossYr_2022, function(x)(Mean_2000_CC_percent - x))) %>%
+    relocate(Mean_2000_CC_percent, .after = Mean_canopy_cover_2000) %>%
+    dplyr::select(-BufferArea_sq_m)
+
+  canopy_loss_rnd_reformat <- canopy_loss_rnd %>%
+    #'  Each column represents area (sq. m) of canopy loss as it accumulates across years
+    pivot_wider(!Year, names_from = LossYear, values_from = CanopyLossArea_sq_m) %>%
+    #'  Join with mean canopy cover from 2000
+    full_join(mean_canopy_den, by = c("ID", "Pack_year", "used")) %>%
+    relocate(Site_Type, .after = Pack_year) %>%
+    relocate(Mean_canopy_cover_2000, .after = used) %>%
+    #'  Put mean % canopy cover in a real percentage
+    mutate(Mean_2000_CC_percent = Mean_canopy_cover_2000 /100,
+           #'  Calculate proportion of area within buffer that was lost over time
+           across(lossYr_2001:lossYr_2022, function(x)(x/BufferArea_sq_m)),
+           #'  Calculate percent of area in buffer lost as it accumulates over time
+           across(lossYr_2001:lossYr_2022, function(x)(x * Mean_2000_CC_percent)),
+           #'  Adjust mean % canopy cover from 2000 by percentage of area lost across years
+           across(lossYr_2001:lossYr_2022, function(x)(Mean_2000_CC_percent - x))) %>%
+    relocate(Mean_2000_CC_percent, .after = Mean_canopy_cover_2000) %>%
+    dplyr::select(-BufferArea_sq_m)
+  
+  
+  
+  
+  #####  Mean Seasonal Greenness  #####
+  #'  ---------------------------
+  mean_denNDVI <- read_csv("./Data/GEE_annual_mean_NDVI_den.csv") %>%
+    dplyr::select(-`.geo`)
   
   #' #####  Surface curvatures  #####
   #' #'  ------------------------
