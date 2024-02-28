@@ -171,7 +171,7 @@
     #'  Each column represents area (sq. m) of canopy loss as it accumulates across years
     pivot_wider(!Year, names_from = LossYear, values_from = CanopyLossArea_sq_m) %>%
     #'  Join with mean canopy cover from 2000
-    full_join(mean_canopy_den, by = c("ID", "Pack_year", "used")) %>%
+    full_join(mean_canopy_rnd, by = c("ID", "Pack_year", "used")) %>%
     relocate(Site_Type, .after = Pack_year) %>%
     relocate(Mean_canopy_cover_2000, .after = used) %>%
     #'  Put mean % canopy cover in a real percentage
@@ -190,8 +190,63 @@
   
   #####  Mean Seasonal Greenness  #####
   #'  ---------------------------
+  #'  Load and format seasonal mean NDVI data, averaged within 250 m radius of each location
   mean_denNDVI <- read_csv("./Data/GEE_annual_mean_NDVI_den.csv") %>%
-    dplyr::select(-`.geo`)
+    dplyr::select(-`.geo`) %>%
+    #'  Remove all characters after year identifier in system:index column
+    mutate(Year_ID = gsub("_.*", " ", `system:index`),
+           #'  Turn Year_ID into an actual year (2000 is first year of NDVI data)
+           NDVI_year = as.numeric(Year_ID) + 2000,
+           #'  Remove all characters before year in pack_year
+           site_year = as.numeric(gsub(".*_", " ", Pack_year))) %>%
+    #'  Rearrange data by pack year so used location is listed first, then all available sites
+    group_by(Pack_year, Year_ID) %>%
+    arrange(ID, .by_group = TRUE) %>%
+    ungroup() %>%
+    rename("mean_seasonal_NDVI" = "mean") %>%
+    arrange(Pack_year, NDVI_year)
+  
+  mean_rndNDVI <- read_csv("./Data/GEE_annual_mean_NDVI_rnd.csv") %>%
+    dplyr::select(-`.geo`) %>%
+    #'  Remove all characters after year identifier in system:index column
+    mutate(Year_ID = gsub("_.*", " ", `system:index`),
+           #'  Turn Year_ID into an actual year (2000 is first year of NDVI data)
+           NDVI_year = as.numeric(Year_ID) + 2000,
+           #'  Remove all characters before year in pack_year
+           site_year = as.numeric(gsub(".*_", " ", Pack_year))) %>%
+    #'  Rearrange data by pack year so used location is listed first, then all available sites
+    group_by(Pack_year, Year_ID) %>%
+    arrange(ID, .by_group = TRUE) %>%
+    ungroup() %>%
+    rename("mean_seasonal_NDVI" = "mean") %>%
+    arrange(Pack_year, NDVI_year)
+  
+  #'  Reduce to only observations where the site year matches the meanNDVI year
+  #'  This reflects what was used and available each year
+  NDVI_denSeason <- mean_denNDVI %>% 
+    filter(site_year == NDVI_year) %>%
+    dplyr::select(c(ID, Pack_year, used, NDVI_year, mean_seasonal_NDVI))
+      
+  NDVI_rndSeason <- mean_rndNDVI %>%
+    filter(site_year == NDVI_year) %>%
+    dplyr::select(c(ID, Pack_year, used, NDVI_year, mean_seasonal_NDVI))
+  
+  ####  NOTE!  ####
+  #'  Agua Frio_2022 and Agua Frio_2023 used den sites have NAs for all years and
+  #'  Agua Frio_2021 used rendezvous site has NAs for all years... something about 
+  #'  these location caused issues when calculating meanNDVI in GEE
+  
+  #'  Calculate overall average NDVI based on what's available across the study area
+  avg_NDVI_denSeason <- mean_denNDVI %>%
+    filter(used == 0) %>%
+    group_by(NDVI_year) %>%
+    reframe(avg_MWEPA_NDVI = mean(mean_seasonal_NDVI)) %>%
+    ungroup()
+  
+  tst <- filter(mean_denNDVI, site_year == 2000)
+  tst2 <- filter(mean_denNDVI, site_year == 2023)
+  
+  
   
   #' #####  Surface curvatures  #####
   #' #'  ------------------------
