@@ -23,8 +23,8 @@
   library(tidyverse)
   
   #'  Load used/available location data and covariates
-  all_data_den <- st_read("./Data/all_data_den.csv")
-  all_data_rnd <- st_read("./Data/all_data_rnd.csv")
+  all_data_den <- read_csv("./Data/all_data_den.csv")
+  all_data_rnd <- read_csv("./Data/all_data_rnd.csv")
   
   #'  Standardize covariate data
   ztransform <- function(dat) {
