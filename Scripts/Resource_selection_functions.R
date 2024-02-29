@@ -142,7 +142,7 @@
                 data = rnd_dataz, weight = wgts, family = binomial)
   summary(h4.rnd)
   car::vif(h4.rnd)
-  h4.rnd.v2 <- glm(used ~ Rough + Curve + logDist2Water + HumanMod + logDist2Road, #+ NDVI
+  h4.rnd.v2 <- glm(used ~ Elev + Rough + Curve + logDist2Water + HumanMod + logDist2Road, #+ NDVI
                 data = rnd_dataz, weight = wgts, family = binomial)
   summary(h4.rnd.v2)
   
