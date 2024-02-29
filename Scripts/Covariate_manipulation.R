@@ -118,17 +118,17 @@
   #####  Annual canopy cover  ##### 
   #'  ------------------------
   #'  Average 2000 canopy cover within 250 of each location (used & available)
-  mean_canopy_den <- read_csv("./Data/GEE_meanCanopyCover_2000_den.csv") %>%
+  mean_canopy_den <- read_csv("./Data/GEE extracted data/GEE_meanCanopyCover_2000_den.csv") %>%
     dplyr::select(c(ID, Pack_year, Site_Type, mean, used)) %>%
     arrange(ID) %>%
     rename("Mean_canopy_cover_2000" = "mean")
-  mean_canopy_rnd <- read_csv("./Data/GEE_meanCanopyCover_2000_rnd.csv") %>%
+  mean_canopy_rnd <- read_csv("./Data/GEE extracted data/GEE_meanCanopyCover_2000_rnd.csv") %>%
     dplyr::select(c(ID, Pack_year, Site_Type, mean, used)) %>%
     arrange(ID) %>%
     rename("Mean_canopy_cover_2000" = "mean")
   
   #'  Sum of area (sq. m) of canopy loss over time within 250m of each location
-  canopy_loss_den <- read_csv("./Data/GEE_accumulated_canopy_loss_area_den.csv") %>%
+  canopy_loss_den <- read_csv("./Data/GEE extracted data/GEE_accumulated_canopy_loss_area_den.csv") %>%
     dplyr::select(c(ID, Pack_year, used, BufferArea_sq_m, CanopyLossArea_sq_m, Year_add1)) %>%
     group_by(Pack_year, Year_add1) %>%
     arrange(ID, .by_group = TRUE) %>%
@@ -136,7 +136,7 @@
            LossYear = paste0("lossYr_", Year)) %>%
     ungroup() %>%
     dplyr::select(-Year_add1) 
-  canopy_loss_rnd <- read_csv("./Data/GEE_accumulated_canopy_loss_area_rnd.csv") %>%
+  canopy_loss_rnd <- read_csv("./Data/GEE extracted data/GEE_accumulated_canopy_loss_area_rnd.csv") %>%
     dplyr::select(c(ID, Pack_year, used, BufferArea_sq_m, CanopyLossArea_sq_m, Year_add1))  %>%
     group_by(Pack_year, Year_add1) %>%
     arrange(ID, .by_group = TRUE) %>%
@@ -163,8 +163,11 @@
            #'  Calculate percent of area in buffer lost as it accumulates over time
            across(lossYr_2001:lossYr_2022, function(x)(x * Mean_2000_CC_percent)),
            #'  Adjust mean % canopy cover from 2000 by percentage of area lost across years
-           across(lossYr_2001:lossYr_2022, function(x)(Mean_2000_CC_percent - x))) %>%
-    relocate(Mean_2000_CC_percent, .after = Mean_canopy_cover_2000) %>%
+           across(lossYr_2001:lossYr_2022, function(x)(Mean_2000_CC_percent - x)),
+           #'  Remove all characters before year in pack_year
+           site_year = as.numeric(gsub(".*_", " ", Pack_year))) %>%
+    rename("canopy_cov_2000" = "Mean_2000_CC_percent") %>%
+    relocate(canopy_cov_2000, .after = Mean_canopy_cover_2000) %>%
     dplyr::select(-BufferArea_sq_m)
 
   canopy_loss_rnd_reformat <- canopy_loss_rnd %>%
@@ -181,17 +184,81 @@
            #'  Calculate percent of area in buffer lost as it accumulates over time
            across(lossYr_2001:lossYr_2022, function(x)(x * Mean_2000_CC_percent)),
            #'  Adjust mean % canopy cover from 2000 by percentage of area lost across years
-           across(lossYr_2001:lossYr_2022, function(x)(Mean_2000_CC_percent - x))) %>%
-    relocate(Mean_2000_CC_percent, .after = Mean_canopy_cover_2000) %>%
+           across(lossYr_2001:lossYr_2022, function(x)(Mean_2000_CC_percent - x)),
+           #'  Remove all characters before year in pack_year
+           site_year = as.numeric(gsub(".*_", " ", Pack_year))) %>%
+    rename("canopy_cov_2000" = "Mean_2000_CC_percent") %>%
+    relocate(canopy_cov_2000, .after = Mean_canopy_cover_2000) %>%
     dplyr::select(-BufferArea_sq_m)
   
+  #'  Re-pivot wide datasets into long format and filter to only years where lossYr and site_year match
+  canopy_cover_den <- canopy_loss_den_reformat %>%
+    dplyr::select(-c(ID, Site_Type, Mean_canopy_cover_2000)) %>%
+    pivot_longer(!c(Pack_year, site_year, used), names_to = "Canopy_year", values_to = "Mean_percent_canopy")
   
+  canopy_cover_rnd <- canopy_loss_rnd_reformat %>%
+    dplyr::select(-c(ID, Site_Type, Mean_canopy_cover_2000)) %>%
+    pivot_longer(!c(Pack_year, site_year, used), names_to = "Canopy_year", values_to = "Mean_percent_canopy")
   
+  #'  Function to relabel the canopy_year for each data set
+  relabel_canopy_year <- function(dat) {
+    relabeled_dat <- dat %>%
+      mutate(Canopy_year = ifelse(Canopy_year == "canopy_cov_2000", "2000", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2001", "2001", Canopy_year), 
+             Canopy_year = ifelse(Canopy_year == "lossYr_2002", "2002", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2003", "2003", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2004", "2004", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2005", "2005", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2006", "2006", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2007", "2007", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2008", "2008", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2009", "2009", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2010", "2010", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2011", "2011", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2012", "2012", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2013", "2013", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2014", "2014", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2015", "2015", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2016", "2016", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2017", "2017", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2018", "2018", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2019", "2019", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2020", "2020", Canopy_year), 
+             Canopy_year = ifelse(Canopy_year == "lossYr_2021", "2021", Canopy_year),
+             Canopy_year = ifelse(Canopy_year == "lossYr_2022", "2022", Canopy_year))
+    return(relabeled_dat)
+  }
+  canopy_cover_den <- relabel_canopy_year(canopy_cover_den) 
+  canopy_cover_rnd <- relabel_canopy_year(canopy_cover_rnd) 
+  
+  #'  Annual canopy cover, averaged across entire study area
+  annual_cover_den <- canopy_cover_den %>%
+    filter(used == 0) %>%
+    group_by(Canopy_year) %>%
+    summarise(avg_MCP_canopycover = mean(Mean_percent_canopy)) %>%
+    ungroup()
+  annual_cover_rnd <- canopy_cover_rnd %>%
+    filter(used == 0) %>%
+    group_by(Canopy_year) %>%
+    summarise(avg_MCP_canopycover = mean(Mean_percent_canopy)) %>%
+    ungroup()
+  
+  #'  Bind site-level and study area average canopy cover data per site and year
+  percent_canopy_den <- canopy_cover_den %>%
+    filter(site_year == Canopy_year) %>%
+    left_join(annual_cover_den, by = "Canopy_year")
+  percent_canopy_rnd <- canopy_cover_rnd %>%
+    filter(site_year == Canopy_year) %>%
+    left_join(annual_cover_den, by = "Canopy_year")
+    
+  #'  Save
+  write_csv(percent_canopy_den, "./Data/GEE extracted data/percent_canopy_denSeason.csv")
+  write_csv(percent_canopy_rnd, "./Data/GEE extracted data/percent_canopy_rndSeason.csv")
   
   #####  Mean Seasonal Greenness  #####
   #'  ---------------------------
   #'  Load and format seasonal mean NDVI data, averaged within 250 m radius of each location
-  mean_denNDVI <- read_csv("./Data/GEE_annual_mean_NDVI_den.csv") %>%
+  mean_denNDVI <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_den.csv") %>%
     dplyr::select(-`.geo`) %>%
     #'  Remove all characters after year identifier in system:index column
     mutate(Year_ID = gsub("_.*", " ", `system:index`),
@@ -203,10 +270,10 @@
     group_by(Pack_year, Year_ID) %>%
     arrange(ID, .by_group = TRUE) %>%
     ungroup() %>%
-    rename("mean_seasonal_NDVI" = "mean") %>%
+    rename("meanNDVI" = "mean") %>%
     arrange(Pack_year, NDVI_year)
   
-  mean_rndNDVI <- read_csv("./Data/GEE_annual_mean_NDVI_rnd.csv") %>%
+  mean_rndNDVI <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_rnd.csv") %>%
     dplyr::select(-`.geo`) %>%
     #'  Remove all characters after year identifier in system:index column
     mutate(Year_ID = gsub("_.*", " ", `system:index`),
@@ -218,35 +285,45 @@
     group_by(Pack_year, Year_ID) %>%
     arrange(ID, .by_group = TRUE) %>%
     ungroup() %>%
-    rename("mean_seasonal_NDVI" = "mean") %>%
+    rename("meanNDVI" = "mean") %>%
     arrange(Pack_year, NDVI_year)
   
   #'  Reduce to only observations where the site year matches the meanNDVI year
   #'  This reflects what was used and available each year
   NDVI_denSeason <- mean_denNDVI %>% 
     filter(site_year == NDVI_year) %>%
-    dplyr::select(c(ID, Pack_year, used, NDVI_year, mean_seasonal_NDVI))
+    dplyr::select(c(ID, Pack_year, used, NDVI_year, meanNDVI))
       
   NDVI_rndSeason <- mean_rndNDVI %>%
     filter(site_year == NDVI_year) %>%
-    dplyr::select(c(ID, Pack_year, used, NDVI_year, mean_seasonal_NDVI))
+    dplyr::select(c(ID, Pack_year, used, NDVI_year, meanNDVI))
   
-  ####  NOTE!  ####
-  #'  Agua Frio_2022 and Agua Frio_2023 used den sites have NAs for all years and
-  #'  Agua Frio_2021 used rendezvous site has NAs for all years... something about 
-  #'  these location caused issues when calculating meanNDVI in GEE
+  #'  Format average NDVI based on what's available across entire study area
+  avg_NDVI_denSeason <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_MCPavg_den.csv") %>%
+    dplyr::select(-`.geo`) %>%
+    #'  Remove all characters after year identifier in system:index column
+    mutate(Year_ID = gsub("_.*", " ", `system:index`),
+           #'  Turn Year_ID into an actual year (2000 is first year of NDVI data)
+           NDVI_year = as.numeric(Year_ID) + 2000) %>%
+    dplyr::select(c(NDVI_year, mean)) %>%
+    rename("avg_MCP_meanNDVI" = "mean")
   
-  #'  Calculate overall average NDVI based on what's available across the study area
-  avg_NDVI_denSeason <- mean_denNDVI %>%
-    filter(used == 0) %>%
-    group_by(NDVI_year) %>%
-    reframe(avg_MWEPA_NDVI = mean(mean_seasonal_NDVI)) %>%
-    ungroup()
+  avg_NDVI_rndSeason <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_MCPavg_rnd.csv") %>%
+    dplyr::select(-`.geo`) %>%
+    #'  Remove all characters after year identifier in system:index column
+    mutate(Year_ID = gsub("_.*", " ", `system:index`),
+           #'  Turn Year_ID into an actual year (2000 is first year of NDVI data)
+           NDVI_year = as.numeric(Year_ID) + 2000) %>%
+    dplyr::select(c(NDVI_year, mean)) %>%
+    rename("avg_MCP_meanNDVI" = "mean")
   
-  tst <- filter(mean_denNDVI, site_year == 2000)
-  tst2 <- filter(mean_denNDVI, site_year == 2023)
+  #'  Merge site-level NDVI with overall mean available NDVI
+  ndvi_den <- left_join(NDVI_denSeason, avg_NDVI_denSeason, by = "NDVI_year") 
+  ndvi_rnd <- left_join(NDVI_rndSeason, avg_NDVI_rndSeason, by = "NDVI_year")
   
-  
+  #'  Save
+  write_csv(ndvi_den, "./Data/mean_NDVI_denSeason.csv")
+  write_csv(ndvi_rnd, "./Data/mean_NDVI_rndSeason.csv")
   
   #' #####  Surface curvatures  #####
   #' #'  ------------------------
