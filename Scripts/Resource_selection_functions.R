@@ -110,7 +110,7 @@
   (den_ModSelect <- model.sel(h1.den, h2.den, h3.den, h4.den))
   
   #'  ---------------------------
-  ####  Rendezvous habitat RSFs  ####
+  ####  Rendezvous habitat RSFs  ####    
   #'  ---------------------------
   #####  H1: Ausband model (wet meadows)  #####
   h1.rnd <- glm(used ~ Rough + Curve, data = rnd_dataz, weight = wgts, family = binomial) #+ NDVI
@@ -118,7 +118,7 @@
   car::vif(h1.rnd)
   
   #####  H2: water availability  #####
-  h2.rnd <- glm(used ~ Rough + Curve + Dist2Water, data = rnd_dataz, weight = wgts, family = binomial) #+ NDVI
+  h2.rnd <- glm(used ~ Elev + Rough + Curve + Dist2Water, data = rnd_dataz, weight = wgts, family = binomial) #+ NDVI
   summary(h2.rnd)
   car::vif(h2.rnd)
   h2.rnd.v2 <- glm(used ~ Rough + Curve + logDist2Water, data = rnd_dataz, weight = wgts, family = binomial) #+ NDVI
@@ -138,7 +138,7 @@
   #'  DeltaAICc < 2
   
   #####  H4: global  #####
-  h4.rnd <- glm(used ~ Rough + Curve + Dist2Water + HumanMod + Dist2Road, #+ NDVI
+  h4.rnd <- glm(used ~ Elev + Rough + Curve + Dist2Water + HumanMod + Dist2Road, #+ NDVI
                 data = rnd_dataz, weight = wgts, family = binomial)
   summary(h4.rnd)
   car::vif(h4.rnd)
