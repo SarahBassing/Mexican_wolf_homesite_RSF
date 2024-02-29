@@ -322,8 +322,8 @@
   ndvi_rnd <- left_join(NDVI_rndSeason, avg_NDVI_rndSeason, by = "NDVI_year")
   
   #'  Save
-  write_csv(ndvi_den, "./Data/mean_NDVI_denSeason.csv")
-  write_csv(ndvi_rnd, "./Data/mean_NDVI_rndSeason.csv")
+  write_csv(ndvi_den, "./Data/GEE extracted data/mean_NDVI_denSeason.csv")
+  write_csv(ndvi_rnd, "./Data/GEE extracted data/mean_NDVI_rndSeason.csv")
   
   #' #####  Surface curvatures  #####
   #' #'  ------------------------
