@@ -80,22 +80,6 @@
   #'  Identify large bodies of water (anything larger than 1 sq-km in size)
   bigwater <- waterbodies[waterbodies$areasqkm > 1,]
   bigwater_nad27 <- st_transform(bigwater, crs = nad27_12N)
-  #' #'  Create a single LINESTRING for I40 and I10
-  #' I40 <- filter(hwys, fullname == "I- 40") %>%
-  #'   st_union()
-  #' I10 <- filter(hwys, fullname == "I- 10") %>%
-  #'   st_union()
-  #' #'  Join highways that border experimental population area
-  #' I40_I10 <- st_union(I40, I10)
-  #' #'  Split southwest polygon by I40
-  #' split_southwest <- lwgeom::st_split(southwest, I40_I10) %>%
-  #'   st_collection_extract("POLYGON")
-  #' split_southwest$include <- factor(seq_len(nrow(split_southwest)))
-  #' ggplot(split_southwest) + geom_sf(aes(fill = include))
-  #' #'  Filter to SBB defined experimental population area and anything south of I40
-  #' wmepa_sbb_defined <- filter(split_southwest, include == 2); st_crs(wmepa_sbb_defined); st_bbox(wmepa_sbb_defined)
-  #' southI40 <- filter(split_southwest, include != 1) %>% st_union(); st_crs(southI40); st_bbox(southI40)
-  #' ggplot(wmepa_sbb_defined) + geom_sf();  ggplot(az_nm) + geom_sf() + geom_sf(data = southI40)
   
   #'  Review each zones & suitable habitat within context of larger experimental 
   #'  population area boundary
@@ -108,14 +92,6 @@
   st_bbox(wmz1)
   wmz1_bbox <- st_as_sfc(st_bbox(wmz1))
   wmz1_extent_wgs84 <- st_transform(wmz1_bbox, wgs84)
-  
-  #'  Save select features
-  # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.shp")
-  # st_write(az_nm, "./Shapefiles/tl_2012_us_state/Arizona_NewMexico.kml", driver = "kml", delete_dsn = TRUE)
-  # st_write(wmepa_sbb_defined, "./Shapefiles/experimental_pop_poly.shp")
-  # st_write(wmepa_wgs84, "./Shapefiles/experimental_pop_poly_wgs84.shp")
-  # st_write(southI40, "./Shapefiles/I40_south_poly.shp")
-  # st_write(wmz1_extent_wgs84, "./Shapefiles/Recoverywmz1_bbox_wgs84.shp")
   
   #'  Create a sf object for locations
   spatial_locs <- function(locs, proj) {
@@ -395,9 +371,9 @@
   #####  Generate random points within buffered area  #####
   #'  ------------------------------------------------
   #'  Number of available locations to generate per used location 
-  #'  Drew 1000 to use for sensitivity analysis
-  #avail_pts <- 1000
-  #'  Drew 100 to use for final analyses based on results of sensitivity analysis
+  #'  Draw 1000 to use for sensitivity analysis
+  # avail_pts <- 1000
+  #'  Draw 100 to use for final analyses based on results of sensitivity analysis
   avail_pts <- 100
   
   #'  Function to generate random available locations based on number of used locations
@@ -493,11 +469,21 @@
   #'  ---------------------
   ####  Gather covariates  ####
   #'  ---------------------
+  #'  Read in covariates extracted from Google Earth Engine
+  #'  Apply 2000 data to sites older than 2000 and 2022 data to sites from 2023
+  #'  due to temporal extent of MODIS and Hansen data
+  canopy_den <- read_csv("./Data/GEE extracted data/percent_canopy_denSeason.csv") %>%
+    dplyr::select(-site_year)
+  canopy_rnd <- read_csv("./Data/GEE extracted data/percent_canopy_rndSeason.csv") %>%
+    dplyr::select(-site_year)
+  ndvi_den <- read_csv("./Data/GEE extracted data/mean_NDVI_denSeason.csv")
+  ndvi_rnd <- read_csv("./Data/GEE extracted data/mean_NDVI_rndSeason.csv")
+  
   #'  Create raster stack of all terrain covariates (must be same grid & res)
   terrain_stack <- c(elev, slope, rough, curve) 
   
   #'  Extract covariate values at each used and available location
-  get_covs <- function(locs_nad83, locs_wgs84) {
+  get_covs <- function(locs_nad83, locs_wgs84, canopy, ndvi) {
     #'  Extract covariate values at each location (use correct projections!)
     terrain <- terra::extract(terrain_stack, locs_nad83) 
     names(terrain) <- c("ID", "Elevation_m", "Slope_degrees", "Roughness_VRM", "Gaussian_curvature")
@@ -516,19 +502,24 @@
     df <- full_join(homesite, terrain, by = "ID") %>%
       full_join(h20, by = "ID") %>%
       full_join(gHM, by = "ID") %>%
-      full_join(rds, by = "ID")
+      full_join(rds, by = "ID") %>%
+      full_join(canopy, by = c("ID", "Pack_year", "used")) %>%
+      full_join(ndvi, by = c("ID", "Pack_year", "used")) %>%
+      dplyr::select(-c(Canopy_year, NDVI_year))
     
     #'  Review data
     print(summary(df))
     
     return(df)
   }
-  all_data_den <- get_covs(den_locs_nad83, locs_wgs84 = den_locs_wgs84)
-  all_data_rnd <- get_covs(rnd_locs_nad83, locs_wgs84 = rnd_locs_wgs84)
+  all_data_den <- get_covs(den_locs_nad83, locs_wgs84 = den_locs_wgs84, canopy = canopy_den, ndvi = ndvi_den)
+  all_data_rnd <- get_covs(rnd_locs_nad83, locs_wgs84 = rnd_locs_wgs84, canopy = canopy_rnd, ndvi = ndvi_rnd)
   
   #'  Save covariate data for all used and available locations
-  st_write(all_data_den, "./Data/all_data_den.csv")
-  st_write(all_data_rnd, "./Data/all_data_rnd.csv")
+  write_csv(all_data_den, "./Data/all_data_den.csv")
+  write_csv(all_data_rnd, "./Data/all_data_rnd.csv")
+  # write_csv(all_data_den, "./Data/all_data_den_1to1000ratio.csv")
+  # write_csv(all_data_rnd, "./Data/all_data_rnd_1to1000ratio.csv")
   
   #'  -----------------------
   #####  Explore covaraites  #####
@@ -601,6 +592,21 @@
     scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
     geom_vline(xintercept = mean(log(all_data_den$Nearest_water_m[all_data_den$used == "used"])), linetype = "dashed", color = "#d95f02") +
     geom_vline(xintercept = mean(log(all_data_den$Nearest_water_m[all_data_den$used == "available"])), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_den, aes(x = Mean_percent_canopy, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Avg. percent canopy cover (250 m radius)", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
+    geom_vline(xintercept = mean(all_data_den$Mean_percent_canopy[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_den$Mean_percent_canopy[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_den, aes(x = meanNDVI, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Avg. seasonal NDVI (250 m radius)", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
+    geom_vline(xintercept = mean(all_data_den$meanNDVI[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_den$meanNDVI[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
+  
   
   ######  Rendezvous site histograms  ######
   ggplot(all_data_rnd, aes(x = Elevation_m, color = used, fill = used)) + 
@@ -652,6 +658,20 @@
     scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
     geom_vline(xintercept = mean(log(all_data_rnd$Nearest_water_m[all_data_rnd$used == "used"])), linetype = "dashed", color = "#d95f02") +
     geom_vline(xintercept = mean(log(all_data_rnd$Nearest_water_m[all_data_rnd$used == "available"])), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_rnd, aes(x = Mean_percent_canopy, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Avg. percent canopy cover (250 m radius)", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
+    geom_vline(xintercept = mean(all_data_rnd$Mean_percent_canopy[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_rnd$Mean_percent_canopy[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
+  ggplot(all_data_rnd, aes(x = meanNDVI, color = used, fill = used)) + 
+    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
+    labs(title = "Used vs Available Locations", x = "Avg. seasonal NDVI (250 m radius)", y = "Frequency") + 
+    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
+    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
+    geom_vline(xintercept = mean(all_data_rnd$meanNDVI[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
+    geom_vline(xintercept = mean(all_data_rnd$meanNDVI[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
   
   
   
