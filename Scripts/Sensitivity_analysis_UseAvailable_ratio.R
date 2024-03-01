@@ -17,8 +17,8 @@
   library(tidyverse)
   
   #'  Load data
-  data_den <- st_read("./Data/all_data_den_1to1000ratio.csv")
-  data_rnd <- st_read("./Data/all_data_rnd_1to1000ratio.csv")
+  data_den <- read_csv("./Data/all_data_den_1to1000ratio.csv")
+  data_rnd <- read_csv("./Data/all_data_rnd_1to1000ratio.csv")
   
   #'  Sub-sample data sets to fewer available locations (2, 10, 20, 50, 100, 200, 500) 
   #'  to evaluate the point at which estimated slope coefficients stabilize
@@ -95,7 +95,7 @@
   den_1_200_mod <- lapply(den_1_200_ratio, fit_den_rsf); summary(den_1_200_mod[[1]]); car::vif(den_1_200_mod[[1]])
   den_1_500_mod <- lapply(den_1_500_ratio, fit_den_rsf); summary(den_1_500_mod[[1]]); car::vif(den_1_500_mod[[1]])
   
-  #'  Fit Ausband et al. (2010) RSF  ############## ADD NDVI eventually
+  #'  Fit simplified version of Ausband et al. (2010) RSF  
   fit_rnd_rsf <- function(dat){
     mod <- lm(used ~ Rough + Curve, weight = wgts, data = dat, family = bimomial(link = "logit"))
     return(mod)
@@ -165,7 +165,7 @@
       labs(x = "Number of available locations", y = "Average coefficient estimate")
     plot(plot_slope)
     #'  Slope parameter #3
-    plot_water <- ggplot(df[df$Parameter == "logNearWater",], aes(factor(nAvailable), y = Estimate)) +
+    plot_water <- ggplot(df[df$Parameter == "logDist2Water",], aes(factor(nAvailable), y = Estimate)) +
       geom_boxplot() + ggtitle("Log of the Distance to nearest waterbody") + theme_light() + 
       labs(x = "Number of available locations", y = "Average coefficient estimate") 
     plot(plot_water)
