@@ -113,10 +113,11 @@
   ####  Exported Google Earth Engine data  ####
   #'  -------------------------------------
   #'  Global forest change data set to estimate annual canopy cover (Hansen Global Forest Change v1.10 (2000-2022))
-  #'  NDVI data set to estimate mean seasonal greenness (MOD13Q1.061 Terra Vegetation Indices 16-Day Global 250m)
+  #'  NDVI data set to estimate mean seasonal greenness (MOD13Q1.061 Terra Vegetation Indices 16-Day Global 250m (2000 - 2023))
   
   #####  Annual canopy cover  ##### 
   #'  ------------------------
+  #'  Derived from Global Forest Change (2000 - 2022) data
   #'  Average 2000 canopy cover within 250 of each location (used & available)
   mean_canopy_den <- read_csv("./Data/GEE extracted data/GEE_meanCanopyCover_2000_den.csv") %>%
     dplyr::select(c(ID, Pack_year, Site_Type, mean, used)) %>%
@@ -165,7 +166,11 @@
            #'  Adjust mean % canopy cover from 2000 by percentage of area lost across years
            across(lossYr_2001:lossYr_2022, function(x)(Mean_2000_CC_percent - x)),
            #'  Remove all characters before year in pack_year
-           site_year = as.numeric(gsub(".*_", " ", Pack_year))) %>%
+           site_year = as.numeric(gsub(".*_", " ", Pack_year)),
+           #'  Change site_year if from before 2000 or after 2022 (need to apply
+           #'  2000 or 2022 to sites outside this time window)
+           site_year = ifelse(site_year < 2000, 2000, site_year),
+           site_year = ifelse(site_year > 2022, 2022, site_year)) %>%
     rename("canopy_cov_2000" = "Mean_2000_CC_percent") %>%
     relocate(canopy_cov_2000, .after = Mean_canopy_cover_2000) %>%
     dplyr::select(-BufferArea_sq_m)
@@ -186,19 +191,23 @@
            #'  Adjust mean % canopy cover from 2000 by percentage of area lost across years
            across(lossYr_2001:lossYr_2022, function(x)(Mean_2000_CC_percent - x)),
            #'  Remove all characters before year in pack_year
-           site_year = as.numeric(gsub(".*_", " ", Pack_year))) %>%
+           site_year = as.numeric(gsub(".*_", " ", Pack_year)),
+           #'  Change site_year if from before 2000 or after 2022 (need to apply
+           #'  2000 or 2022 to sites outside this time window)
+           site_year = ifelse(site_year < 2000, 2000, site_year),
+           site_year = ifelse(site_year > 2022, 2022, site_year)) %>%
     rename("canopy_cov_2000" = "Mean_2000_CC_percent") %>%
     relocate(canopy_cov_2000, .after = Mean_canopy_cover_2000) %>%
     dplyr::select(-BufferArea_sq_m)
   
   #'  Re-pivot wide datasets into long format and filter to only years where lossYr and site_year match
   canopy_cover_den <- canopy_loss_den_reformat %>%
-    dplyr::select(-c(ID, Site_Type, Mean_canopy_cover_2000)) %>%
-    pivot_longer(!c(Pack_year, site_year, used), names_to = "Canopy_year", values_to = "Mean_percent_canopy")
+    dplyr::select(-c(Site_Type, Mean_canopy_cover_2000)) %>%
+    pivot_longer(!c(ID, Pack_year, site_year, used), names_to = "Canopy_year", values_to = "Mean_percent_canopy")
   
   canopy_cover_rnd <- canopy_loss_rnd_reformat %>%
-    dplyr::select(-c(ID, Site_Type, Mean_canopy_cover_2000)) %>%
-    pivot_longer(!c(Pack_year, site_year, used), names_to = "Canopy_year", values_to = "Mean_percent_canopy")
+    dplyr::select(-c(Site_Type, Mean_canopy_cover_2000)) %>%
+    pivot_longer(!c(ID, Pack_year, site_year, used), names_to = "Canopy_year", values_to = "Mean_percent_canopy")
   
   #'  Function to relabel the canopy_year for each data set
   relabel_canopy_year <- function(dat) {
@@ -249,7 +258,7 @@
     left_join(annual_cover_den, by = "Canopy_year")
   percent_canopy_rnd <- canopy_cover_rnd %>%
     filter(site_year == Canopy_year) %>%
-    left_join(annual_cover_den, by = "Canopy_year")
+    left_join(annual_cover_rnd, by = "Canopy_year")
     
   #'  Save
   write_csv(percent_canopy_den, "./Data/GEE extracted data/percent_canopy_denSeason.csv")
@@ -257,6 +266,7 @@
   
   #####  Mean Seasonal Greenness  #####
   #'  ---------------------------
+  #'  Derived from MODIS Terra 16-day (2000 - 2023) data
   #'  Load and format seasonal mean NDVI data, averaged within 250 m radius of each location
   mean_denNDVI <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_den.csv") %>%
     dplyr::select(-`.geo`) %>%
@@ -265,7 +275,10 @@
            #'  Turn Year_ID into an actual year (2000 is first year of NDVI data)
            NDVI_year = as.numeric(Year_ID) + 2000,
            #'  Remove all characters before year in pack_year
-           site_year = as.numeric(gsub(".*_", " ", Pack_year))) %>%
+           site_year = as.numeric(gsub(".*_", " ", Pack_year)),
+           #'  Change site_year if from before 2000 (need to apply 2000 data to 
+           #'  sites from before this time window)
+           site_year = ifelse(site_year < 2000, 2000, site_year)) %>%
     #'  Rearrange data by pack year so used location is listed first, then all available sites
     group_by(Pack_year, Year_ID) %>%
     arrange(ID, .by_group = TRUE) %>%
@@ -280,7 +293,10 @@
            #'  Turn Year_ID into an actual year (2000 is first year of NDVI data)
            NDVI_year = as.numeric(Year_ID) + 2000,
            #'  Remove all characters before year in pack_year
-           site_year = as.numeric(gsub(".*_", " ", Pack_year))) %>%
+           site_year = as.numeric(gsub(".*_", " ", Pack_year)),
+           #'  Change site_year if from before 2000 (need to apply 2000 data to 
+           #'  sites from before this time window)
+           site_year = ifelse(site_year < 2000, 2000, site_year)) %>%
     #'  Rearrange data by pack year so used location is listed first, then all available sites
     group_by(Pack_year, Year_ID) %>%
     arrange(ID, .by_group = TRUE) %>%
