@@ -341,6 +341,7 @@
   write_csv(ndvi_den, "./Data/GEE extracted data/mean_NDVI_denSeason.csv")
   write_csv(ndvi_rnd, "./Data/GEE extracted data/mean_NDVI_rndSeason.csv")
   
+  
   #' #####  Surface curvatures  #####
   #' #'  ------------------------
   #' #'  Gaussian curvature and Profile curvature
