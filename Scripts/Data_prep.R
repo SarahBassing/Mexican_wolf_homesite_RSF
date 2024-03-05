@@ -37,15 +37,17 @@
   human_mod <- terra::rast("./Shapefiles/Human_variables/mosaic_global_Human_Modification.tif"); res(human_mod); crs(human_mod)
   roads <- terra::rast("./Shapefiles/Human_variables/mosaic_dist2road.tif"); res(roads); crs(roads)
   
-  #' #'  Empty raster to extract covariates for each pixel for predicting phase of study
-  #' s <- elev
-  #' values(s) <- NA
-  #' s
-  #' s_gridID <- as.data.frame(s)
-  #' s_coord <- coordinates(s)
-  #' s_grid <- cbind(s_gridID, s_coord)
-  #' #'  Mask large bodies of water from raster
-  #' s_mask <- mask(s, bigwater, inverse = TRUE)
+  #' #'  Grab dimensions of elev raster
+  #' rast_dim <- dim(elev); rast_rows <- rast_dim[1]; rast_cols <- rast_dim[2]
+  #' new_cell_id <- seq(1:(rast_rows * rast_cols))
+  #' #'  Create empty raster based on extent, resolution, & coord system of elevation raster
+  #' empty_rast <- rast(elev, nlyrs = nlyr(elev), names = "CellID", vals = new_cell_id, keeptime = FALSE, 
+  #'                    keepunits = FALSE, props = FALSE) 
+  #' #'  Make sure it checks out
+  #' res(empty_rast); crs(empty_rast); st_bbox(empty_rast); st_bbox(elev)
+  #' #'  Save that sucker
+  #' writeRaster(empty_rast, filename  = "./Shapefiles/Reference_grid_30m.tif", overwrite = TRUE)
+  empty_rast <- terra::rast("./Shapefiles/Reference_grid_30m.tif")
   
   #'  Define WGS84 coordinate systems
   wgs84 <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
@@ -67,6 +69,7 @@
   wmepa_suitable <- st_intersection(wmepa_wgs84, suitable_habitat)
   plot(wmepa_suitable[1])
   wmepa_suitable_nad27 <- st_transform(wmepa_suitable, crs = nad27_12N)
+  wmepa_suitable_nad83 <- st_transform(wmepa_suitable, crs = nad83)
   
   #'  State, highway, and waterbody shapefiles
   usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
@@ -80,6 +83,7 @@
   #'  Identify large bodies of water (anything larger than 1 sq-km in size)
   bigwater <- waterbodies[waterbodies$areasqkm > 1,]
   bigwater_nad27 <- st_transform(bigwater, crs = nad27_12N)
+  bigwater_nad83 <- st_transform(bigwater, crs = nad83)
   
   #'  Review each zones & suitable habitat within context of larger experimental 
   #'  population area boundary
@@ -364,8 +368,8 @@
   #'  Save as shapefiles
   homesite_mcp_buff_wgs84 <- st_transform(homesite_mcp_buff, wgs84); st_bbox(homesite_mcp_buff_wgs84)
   homesite_mcp_buff_suitablemask_wgs84 <- st_transform(homesite_mcp_buff_suitablemask, wgs84); st_bbox(homesite_mcp_buff_suitablemask_wgs84)
-  st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.shp")
-  st_write(homesite_mcp_buff_suitablemask, "./Shapefiles/Homesites/Homesite_buffered_MCP_suitableHabitat.shp")
+  # st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.shp")
+  # st_write(homesite_mcp_buff_suitablemask, "./Shapefiles/Homesites/Homesite_buffered_MCP_suitableHabitat.shp")
   
   #'  ------------------------------------------------
   #####  Generate random points within buffered area  #####
@@ -431,9 +435,9 @@
   avail_locs_rnd_nad83 <- st_transform(avail_locs_rnd, nad83)
   avail_locs_rnd_wgs84 <- st_transform(avail_locs_rnd, wgs84)
   
-  #'  Save available locations 
-  st_write(avail_locs_den_wgs84, "./Shapefiles/Homesites/Available_locations_den.shp")
-  st_write(avail_locs_rnd_wgs84, "./Shapefiles/Homesites/Available_locations_rnd.shp")
+  #' #'  Save available locations 
+  #' st_write(avail_locs_den_wgs84, "./Shapefiles/Homesites/Available_locations_den.shp")
+  #' st_write(avail_locs_rnd_wgs84, "./Shapefiles/Homesites/Available_locations_rnd.shp")
   
   #'  Combine used and available locations per homesite type 
   all_locs <- function(used, avail) {
@@ -607,7 +611,6 @@
     geom_vline(xintercept = mean(all_data_den$meanNDVI[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
     geom_vline(xintercept = mean(all_data_den$meanNDVI[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
   
-  
   ######  Rendezvous site histograms  ######
   ggplot(all_data_rnd, aes(x = Elevation_m, color = used, fill = used)) + 
     geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
@@ -673,5 +676,25 @@
     geom_vline(xintercept = mean(all_data_rnd$meanNDVI[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
     geom_vline(xintercept = mean(all_data_rnd$meanNDVI[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
   
+  #'  -----------------------------------------
+  ####  Extract covariates for reference grid  ####
+  #'  -----------------------------------------
+  #' #'  Mask out waterbodies
+  #' masked_water <- mask(empty_rast, bigwater_nad83, inverse = TRUE)
+  #' plot(masked_water)
+  #' #'  Mask out unsuitable areas (so areas NOT in the wmep_suitable polygon)
+  #' wmepa_grid <- mask(masked_water, wmepa_suitable_nad83)
+  #' plot(wmepa_grid); plot(homesites_nad83, add = TRUE)
+  #' #'  Save
+  #' writeRaster(wmepa_grid, "./Shapefiles/WMEPA_masked_grid.tif", overwrite = TRUE)
+  
+  #'  Convert masked wmepa_grid to a polygon
+  wmepa_grid <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif")
+  wmepa_poly <- as.polygons(wmepa_grid)
+  wmepa_poly_sf <- st_as_sf(wmepa_poly)
+  st_write(wmepa_poly_sf, "./Shapefiles/WMEPA_masked_polygon.shp")
+  
+  
+  #'  Crop to just buffered MCP area
   
   
