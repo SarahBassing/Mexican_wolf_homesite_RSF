@@ -37,12 +37,9 @@
   human_mod <- terra::rast("./Shapefiles/Human_variables/mosaic_global_Human_Modification.tif"); res(human_mod); crs(human_mod)
   roads <- terra::rast("./Shapefiles/Human_variables/mosaic_dist2road.tif"); res(roads); crs(roads)
   
-  #' #'  Grab dimensions of elev raster
-  #' rast_dim <- dim(elev); rast_rows <- rast_dim[1]; rast_cols <- rast_dim[2]
-  #' new_cell_id <- seq(1:(rast_rows * rast_cols))
   #' #'  Create empty raster based on extent, resolution, & coord system of elevation raster
-  #' empty_rast <- rast(elev, nlyrs = nlyr(elev), names = "CellID", vals = new_cell_id, keeptime = FALSE, 
-  #'                    keepunits = FALSE, props = FALSE) 
+  #' empty_rast <- rast(elev, nlyrs = nlyr(elev), names = "CellID", vals = 1:ncell(elev), keeptime = FALSE,
+  #'                    keepunits = FALSE, props = FALSE)
   #' #'  Make sure it checks out
   #' res(empty_rast); crs(empty_rast); st_bbox(empty_rast); st_bbox(elev)
   #' #'  Save that sucker
@@ -679,22 +676,30 @@
   #'  -----------------------------------------
   ####  Extract covariates for reference grid  ####
   #'  -----------------------------------------
-  #' #'  Mask out waterbodies
-  #' masked_water <- mask(empty_rast, bigwater_nad83, inverse = TRUE)
-  #' plot(masked_water)
-  #' #'  Mask out unsuitable areas (so areas NOT in the wmep_suitable polygon)
-  #' wmepa_grid <- mask(masked_water, wmepa_suitable_nad83)
-  #' plot(wmepa_grid); plot(homesites_nad83, add = TRUE)
-  #' #'  Save
-  #' writeRaster(wmepa_grid, "./Shapefiles/WMEPA_masked_grid.tif", overwrite = TRUE)
+  #'  Mask out waterbodies
+  masked_water <- mask(empty_rast, bigwater_nad83, inverse = TRUE)
+  plot(masked_water)
+  #'  Mask out unsuitable areas (so areas NOT in the wmep_suitable polygon)
+  wmepa_grid <- mask(masked_water, wmepa_suitable_nad83)
+  plot(wmepa_grid); plot(homesites_nad83[1], add = TRUE)
+  #'  Save
+  writeRaster(wmepa_grid, "./Shapefiles/WMEPA_masked_grid.tif", overwrite = TRUE)
   
-  #'  Convert masked wmepa_grid to a polygon
-  wmepa_grid <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif")
-  wmepa_poly <- as.polygons(wmepa_grid)
-  wmepa_poly_sf <- st_as_sf(wmepa_poly)
-  st_write(wmepa_poly_sf, "./Shapefiles/WMEPA_masked_polygon.shp")
+  #' #'  Extract centroid of each grid cell from WMEPA masked grid
+  #' wmepa_grid <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif")
+  #' #'  Convert to a polygon and sf object
+  #' wmepa_poly <- as.polygons(wmepa_grid)  # THIS TAKES FOREVER
+  #' wmepa_poly_sf <- st_as_sf(wmepa_poly)
+  #' st_write(wmepa_poly_sf, "./Shapefiles/WMEPA_masked_polygon.shp")
+  #' #'  Grab centroid coordinates and create a data frame with cell ID and lat/long
+  #' wmepa_grid_centroid <- st_centroid(wmepa_poly_sf)
+  #' wmepa_grid_coords <- st_coordinates(wmepa_grid_centroid)
+  #' wmepa_grid_cellID <- wmepa_grid_centroid$CellID
+  #' wmepa_grid_cellID <- as.data.frame(wmepa_grid_cellID)
+  #' names(wmepa_grid_cellID) <- "cellID"
+  #' wmepa_grid_pts <- bind_cols(wmepa_grid_cellID, wmepa_grid_coords)
+  #' write_csv(wmepa_grid_pts, file = "./Data/WMEPA_suitable_grid_points.csv")
   
   
-  #'  Crop to just buffered MCP area
   
   
