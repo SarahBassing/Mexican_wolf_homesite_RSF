@@ -19,6 +19,8 @@
   library(spdep)
   library(adehabitatHR)
   library(tidyverse)
+  #'  NOTE: dplyr arrange() orders pack names differently depending on package version. 
+  #'  Use dplyr 1.1.4 for consistency
   
   #'  ------------------------
   ####  Load and format data  ####
@@ -95,8 +97,9 @@
   wmz1_extent_wgs84 <- st_transform(wmz1_bbox, wgs84)
   
   #'  Create a sf object for locations
+  #'  ####  NOTE: dplyr arrange() orders pack names differently depending on package version. Use dplyr 1.1.4 to be consistent
   spatial_locs <- function(locs, proj) {
-    locs <- arrange(locs, Pack_year)
+    locs <- arrange(locs, Pack_year)      
     sf_locs <- st_as_sf(locs, coords = c("Longitude", "Latitude"), crs = wgs84) %>%
       mutate(obs = seq(1:nrow(.))) %>%
       relocate(obs, .before = Pack_year) %>%
@@ -463,9 +466,9 @@
   den_locs_nad83 <- st_transform(den_locs_wgs84, nad83)
   rnd_locs_nad83 <- st_transform(rnd_locs_wgs84, nad83)
   
-  #'  Save all locations
-  st_write(den_locs_wgs84, "./Shapefiles/Homesites/Used_Available_locations_den.shp")
-  st_write(rnd_locs_wgs84, "./Shapefiles/Homesites/Used_Available_locations_rnd.shp")
+  #' #'  Save all locations
+  #' st_write(den_locs_wgs84, "./Shapefiles/Homesites/Used_Available_locations_den.shp")
+  #' st_write(rnd_locs_wgs84, "./Shapefiles/Homesites/Used_Available_locations_rnd.shp")
   
   #'  ---------------------
   ####  Gather covariates  ####
