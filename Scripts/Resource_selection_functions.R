@@ -67,7 +67,7 @@
   summary(h0.den)
   
   #####  H1: physical protection  #####
-  h1.den <- glm(used ~ Elev + Slope + Rough, data = den_dataz, weight = wgts, family = binomial) 
+  h1.den <- glm(used ~ Elev + Slope + Rough + CanopyCov * AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
   summary(h1.den)
   car::vif(h1.den)
   
