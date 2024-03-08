@@ -690,7 +690,7 @@
   
   #'  Convert masked wmepa_grid to a polygon
   wmepa_grid <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif")
-  wmepa_poly <- as.polygons(wmepa_grid)
+  wmepa_poly <- as.polygons(wmepa_grid, trunc = TRUE, dissolve = TRUE)
   wmepa_poly_sf <- st_as_sf(wmepa_poly)
   st_write(wmepa_poly_sf, "./Shapefiles/WMEPA_masked_polygon.shp")
   
