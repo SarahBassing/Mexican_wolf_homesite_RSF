@@ -685,13 +685,6 @@
   #'  Save
   writeRaster(wmepa_grid, "./Shapefiles/WMEPA_masked_grid.tif", overwrite = TRUE)
   
-<<<<<<< HEAD
-  #'  Convert masked wmepa_grid to a polygon
-  wmepa_grid <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif")
-  wmepa_poly <- as.polygons(wmepa_grid, trunc = TRUE, dissolve = TRUE)
-  wmepa_poly_sf <- st_as_sf(wmepa_poly)
-  st_write(wmepa_poly_sf, "./Shapefiles/WMEPA_masked_polygon.shp")
-=======
   #' #'  Extract centroid of each grid cell from WMEPA masked grid
   #' wmepa_grid <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif")
   #' #'  Convert to a polygon and sf object
@@ -711,8 +704,7 @@
     st_transform(wgs84) %>%
     mutate(newID = 1:nrow(.))
   st_write(wmepa_grid_pts, "./Shapefiles/WMEPA_grid_points.shp")
->>>>>>> ae4d7ac1ae7f06742130879e413517621834c339
-  
+
   #'  Load GEE data for entire suitable portions of MWEPA
   
   
