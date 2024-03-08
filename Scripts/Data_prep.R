@@ -699,7 +699,12 @@
   #' names(wmepa_grid_cellID) <- "cellID"
   #' wmepa_grid_pts <- bind_cols(wmepa_grid_cellID, wmepa_grid_coords)
   #' write_csv(wmepa_grid_pts, file = "./Data/WMEPA_suitable_grid_points.csv")
+  wmepa_grid_pts <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
+  wmepa_grid_pts <- st_as_sf(wmepa_grid_pts, coords = c("X", "Y"), crs = nad83) %>%
+    st_transform(wgs84) %>%
+    mutate(newID = 1:nrow(.))
+  st_write(wmepa_grid_pts, "./Shapefiles/WMEPA_grid_points.shp")
   
-  
+  #'  Load GEE data for entire suitable portions of MWEPA
   
   
