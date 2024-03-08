@@ -28,6 +28,8 @@
   
   #'  Standardize covariate data
   ztransform <- function(dat) {
+    dat <- as.data.frame(dat) %>%
+      dplyr::select(-geometry)
     #'  Center and scale covariates
     dat_z <- dat %>%
       transmute(Pack_year = Pack_year,
