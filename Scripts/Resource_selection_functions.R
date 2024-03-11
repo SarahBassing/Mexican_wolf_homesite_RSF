@@ -69,16 +69,16 @@
   summary(h0.den)
   
   #####  H1: physical protection  #####
-  h1.den <- glm(used ~ Elev + Slope + Rough + CanopyCov * AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
+  h1.den <- glm(used ~ Elev + Slope + Rough + CanopyCov:AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
   summary(h1.den)
   car::vif(h1.den)
   
   #####  H2: physical protection and water availability  ####
-  h2.den <- glm(used ~ Elev + Slope + Rough + Dist2Water + CanopyCov * AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
+  h2.den <- glm(used ~ Elev + Slope + Rough + Dist2Water + CanopyCov:AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
   summary(h2.den)
   car::vif(h2.den)
   #'  What about using the log of the distance to nearest waster?
-  h2.den.v2 <- glm(used ~ Elev + Slope + Rough + logDist2Water + CanopyCov * AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
+  h2.den.v2 <- glm(used ~ Elev + Slope + Rough + logDist2Water + CanopyCov:AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
   summary(h2.den.v2)
   
   #'  Which version of the model is most supported
@@ -100,16 +100,16 @@
   #'  Dist2Road pval >0.1, logDist2Road pval <0.1 but >0.05 
   
   #####  H4: global model  #####
-  h4.den <- glm(used ~ Elev + Slope + Rough + Dist2Water + CanopyCov * AvgCanopyCov + HumanMod + Dist2Road, 
+  h4.den <- glm(used ~ Elev + Slope + Rough + Dist2Water + CanopyCov:AvgCanopyCov + HumanMod + Dist2Road, 
                 data = den_dataz, weight = wgts, family = binomial) 
   summary(h4.den)
   car::vif(h4.den)
   #'  What about using the log of the distance to nearest water and road?
-  h4.den.v2 <- glm(used ~ Elev + Slope + Rough + logDist2Water + CanopyCov * AvgCanopyCov + HumanMod + logDist2Road, 
+  h4.den.v2 <- glm(used ~ Elev + Slope + Rough + logDist2Water + CanopyCov:AvgCanopyCov + HumanMod + logDist2Road, 
                 data = den_dataz, weight = wgts, family = binomial)
   summary(h4.den.v2)
   #'  What about mixing and matching based on which variable was most supported for H2 & H3?
-  h4.den.v3 <- glm(used ~ Elev + Slope + Rough + Dist2Water + CanopyCov * AvgCanopyCov + HumanMod + logDist2Road, 
+  h4.den.v3 <- glm(used ~ Elev + Slope + Rough + Dist2Water + CanopyCov:AvgCanopyCov + HumanMod + logDist2Road, 
                    data = den_dataz, weight = wgts, family = binomial)
   summary(h4.den.v3)
   
@@ -128,15 +128,15 @@
   summary(h0.rnd)
   
   #####  H1: Ausband model (wet meadows)  #####
-  h1.rnd <- glm(used ~ Rough + Curve + SeasonalNDVI * AvgSeasonalNDVI, data = rnd_dataz, weight = wgts, family = binomial) 
+  h1.rnd <- glm(used ~ Rough + Curve + SeasonalNDVI:AvgSeasonalNDVI, data = rnd_dataz, weight = wgts, family = binomial) 
   summary(h1.rnd)
   car::vif(h1.rnd)
   
   #####  H2: water availability  #####
-  h2.rnd <- glm(used ~ Elev + Rough + Curve + Dist2Water + SeasonalNDVI * AvgSeasonalNDVI, data = rnd_dataz, weight = wgts, family = binomial) 
+  h2.rnd <- glm(used ~ Elev + Rough + Curve + SeasonalNDVI:AvgSeasonalNDVI + Dist2Water, data = rnd_dataz, weight = wgts, family = binomial) 
   summary(h2.rnd)
   car::vif(h2.rnd)
-  h2.rnd.v2 <- glm(used ~ Elev + Rough + Curve + SeasonalNDVI * AvgSeasonalNDVI + logDist2Water, data = rnd_dataz, weight = wgts, family = binomial) 
+  h2.rnd.v2 <- glm(used ~ Elev + Rough + Curve + SeasonalNDVI:AvgSeasonalNDVI + logDist2Water, data = rnd_dataz, weight = wgts, family = binomial) 
   summary(h2.rnd.v2)
   
   model.sel(h2.rnd, h2.rnd.v2)
@@ -153,11 +153,11 @@
   #'  DeltaAICc < 2
   
   #####  H4: global  #####
-  h4.rnd <- glm(used ~ Elev + Rough + Curve + SeasonalNDVI * AvgSeasonalNDVI + Dist2Water + HumanMod + Dist2Road, 
+  h4.rnd <- glm(used ~ Elev + Rough + Curve + SeasonalNDVI:AvgSeasonalNDVI + Dist2Water + HumanMod + Dist2Road, 
                 data = rnd_dataz, weight = wgts, family = binomial)
   summary(h4.rnd)
   car::vif(h4.rnd)
-  h4.rnd.v2 <- glm(used ~ Elev + Rough + Curve + SeasonalNDVI * AvgSeasonalNDVI + logDist2Water + HumanMod + logDist2Road, 
+  h4.rnd.v2 <- glm(used ~ Elev + Rough + Curve + SeasonalNDVI:AvgSeasonalNDVI + logDist2Water + HumanMod + logDist2Road, 
                 data = rnd_dataz, weight = wgts, family = binomial)
   summary(h4.rnd.v2)
   
