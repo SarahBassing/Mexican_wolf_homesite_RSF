@@ -702,12 +702,33 @@
   #' names(wmepa_grid_cellID) <- "cellID"
   #' wmepa_grid_pts <- bind_cols(wmepa_grid_cellID, wmepa_grid_coords)
   #' write_csv(wmepa_grid_pts, file = "./Data/WMEPA_suitable_grid_points.csv")
+  #' #'  Convert data to shapefiles
   wmepa_grid_pts <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
   wmepa_grid_pts <- st_as_sf(wmepa_grid_pts, coords = c("X", "Y"), crs = nad83) %>%
     st_transform(wgs84) %>%
     mutate(newID = 1:nrow(.))
-  st_write(wmepa_grid_pts, "./Shapefiles/WMEPA_grid_points.shp")
+  #'  Slit it into more manageable chunks
+  nrow(wmepa_grid_pts)
+  wmepa_grid_pts1 <- wmepa_grid_pts[1:1000000,]
+  wmepa_grid_pts2 <- wmepa_grid_pts[1000001:2000000,]
+  wmepa_grid_pts3 <- wmepa_grid_pts[2000001:3000000,]
+  wmepa_grid_pts4 <- wmepa_grid_pts[3000001:4000000,]
+  wmepa_grid_pts5 <- wmepa_grid_pts[4000001:5000000,]
+  wmepa_grid_pts6 <- wmepa_grid_pts[5000001:6000000,]
+  wmepa_grid_pts7 <- wmepa_grid_pts[6000001:7000000,]
+  wmepa_grid_pts8 <- wmepa_grid_pts[7000001:nrow(wmepa_grid_pts),]
 
-  #'  Load GEE data for entire suitable portions of MWEPA
+  #'  Save shapefiles
+  st_write(wmepa_grid_pts, "./Shapefiles/WMEPA_grid_points.shp")
+  st_write(wmepa_grid_pts1, "./Shapefiles/WMEPA_grid_points1.shp")
+  st_write(wmepa_grid_pts2, "./Shapefiles/WMEPA_grid_points2.shp")
+  st_write(wmepa_grid_pts3, "./Shapefiles/WMEPA_grid_points3.shp")
+  st_write(wmepa_grid_pts4, "./Shapefiles/WMEPA_grid_points4.shp")
+  st_write(wmepa_grid_pts5, "./Shapefiles/WMEPA_grid_points5.shp")
+  st_write(wmepa_grid_pts6, "./Shapefiles/WMEPA_grid_points6.shp")
+  st_write(wmepa_grid_pts7, "./Shapefiles/WMEPA_grid_points7.shp")
+  st_write(wmepa_grid_pts8, "./Shapefiles/WMEPA_grid_points8.shp")
+  
+  
   
   
