@@ -709,25 +709,49 @@
     mutate(newID = 1:nrow(.))
   #'  Slit it into more manageable chunks
   nrow(wmepa_grid_pts)
-  wmepa_grid_pts1 <- wmepa_grid_pts[1:1000000,]
-  wmepa_grid_pts2 <- wmepa_grid_pts[1000001:2000000,]
-  wmepa_grid_pts3 <- wmepa_grid_pts[2000001:3000000,]
-  wmepa_grid_pts4 <- wmepa_grid_pts[3000001:4000000,]
-  wmepa_grid_pts5 <- wmepa_grid_pts[4000001:5000000,]
-  wmepa_grid_pts6 <- wmepa_grid_pts[5000001:6000000,]
-  wmepa_grid_pts7 <- wmepa_grid_pts[6000001:7000000,]
-  wmepa_grid_pts8 <- wmepa_grid_pts[7000001:nrow(wmepa_grid_pts),]
+  wmepa_grid_pts1aa <- wmepa_grid_pts[1:250000,]
+  wmepa_grid_pts1ab <- wmepa_grid_pts[250001:500000,]
+  wmepa_grid_pts1b <- wmepa_grid_pts[500001:1000000,]
+  wmepa_grid_pts2a <- wmepa_grid_pts[1000001:1500000,]
+  wmepa_grid_pts2ba <- wmepa_grid_pts[1500001:1750000,]
+  wmepa_grid_pts2bb <- wmepa_grid_pts[1750001:2000000,]
+  wmepa_grid_pts3aa <- wmepa_grid_pts[2000001:2250000,]
+  wmepa_grid_pts3ab <- wmepa_grid_pts[2250001:2500000,]
+  wmepa_grid_pts3b <- wmepa_grid_pts[2500001:3000000,]
+  wmepa_grid_pts4a <- wmepa_grid_pts[3000001:3500000,]
+  wmepa_grid_pts4b <- wmepa_grid_pts[3500001:4000000,]
+  wmepa_grid_pts5a <- wmepa_grid_pts[4000001:4500000,]
+  wmepa_grid_pts5b <- wmepa_grid_pts[4500001:5000000,]
+  wmepa_grid_pts6a <- wmepa_grid_pts[5000001:5500000,]
+  wmepa_grid_pts6b <- wmepa_grid_pts[5500001:6000000,]   
+  wmepa_grid_pts7a <- wmepa_grid_pts[6000001:6500000,]
+  wmepa_grid_pts7b <- wmepa_grid_pts[6500001:7000000,]
+  wmepa_grid_pts8a <- wmepa_grid_pts[7000001:7500000,]
+  wmepa_grid_pts8b <- wmepa_grid_pts[7500001:8000000,]
+  wmepa_grid_pts9a <- wmepa_grid_pts[8000001:nrow(wmepa_grid_pts),]
 
   #'  Save shapefiles
   st_write(wmepa_grid_pts, "./Shapefiles/WMEPA_grid_points.shp")
-  st_write(wmepa_grid_pts1, "./Shapefiles/WMEPA_grid_points1.shp")
-  st_write(wmepa_grid_pts2, "./Shapefiles/WMEPA_grid_points2.shp")
-  st_write(wmepa_grid_pts3, "./Shapefiles/WMEPA_grid_points3.shp")
-  st_write(wmepa_grid_pts4, "./Shapefiles/WMEPA_grid_points4.shp")
-  st_write(wmepa_grid_pts5, "./Shapefiles/WMEPA_grid_points5.shp")
-  st_write(wmepa_grid_pts6, "./Shapefiles/WMEPA_grid_points6.shp")
-  st_write(wmepa_grid_pts7, "./Shapefiles/WMEPA_grid_points7.shp")
-  st_write(wmepa_grid_pts8, "./Shapefiles/WMEPA_grid_points8.shp")
+  st_write(wmepa_grid_pts1aa, "./Shapefiles/WMEPA_grid_points1aa.shp")
+  st_write(wmepa_grid_pts1ab, "./Shapefiles/WMEPA_grid_points1ab.shp")
+  st_write(wmepa_grid_pts1b, "./Shapefiles/WMEPA_grid_points1b.shp")
+  st_write(wmepa_grid_pts2a, "./Shapefiles/WMEPA_grid_points2a.shp")
+  st_write(wmepa_grid_pts2ba, "./Shapefiles/WMEPA_grid_points2ba.shp")
+  st_write(wmepa_grid_pts2bb, "./Shapefiles/WMEPA_grid_points2bb.shp")
+  st_write(wmepa_grid_pts3aa, "./Shapefiles/WMEPA_grid_points3aa.shp")
+  st_write(wmepa_grid_pts3ab, "./Shapefiles/WMEPA_grid_points3ab.shp")
+  st_write(wmepa_grid_pts3b, "./Shapefiles/WMEPA_grid_points3b.shp")
+  st_write(wmepa_grid_pts4a, "./Shapefiles/WMEPA_grid_points4a.shp")
+  st_write(wmepa_grid_pts4b, "./Shapefiles/WMEPA_grid_points4b.shp")
+  st_write(wmepa_grid_pts5a, "./Shapefiles/WMEPA_grid_points5a.shp")
+  st_write(wmepa_grid_pts5b, "./Shapefiles/WMEPA_grid_points5b.shp")
+  st_write(wmepa_grid_pts6a, "./Shapefiles/WMEPA_grid_points6a.shp")
+  st_write(wmepa_grid_pts6b, "./Shapefiles/WMEPA_grid_points6b.shp")
+  st_write(wmepa_grid_pts7a, "./Shapefiles/WMEPA_grid_points7a.shp")
+  st_write(wmepa_grid_pts7b, "./Shapefiles/WMEPA_grid_points7b.shp")
+  st_write(wmepa_grid_pts8a, "./Shapefiles/WMEPA_grid_points8a.shp")
+  st_write(wmepa_grid_pts8b, "./Shapefiles/WMEPA_grid_points8b.shp")
+  st_write(wmepa_grid_pts9a, "./Shapefiles/WMEPA_grid_points9a.shp")
   
   
   
