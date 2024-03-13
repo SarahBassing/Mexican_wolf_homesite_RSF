@@ -672,6 +672,8 @@
   #'  -----------------------------------------
   #'  Load reference grid centroids
   grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp"); crs(grid_pts)
+  grid_pts_xy <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
+  
   #'  Load 2023 rendezvous season NDVI values for entire grid (extracted from GEE 
   #'  and formatted in Covariate_manipulation.R script)
   ndvi_grid <- read_csv("./Data/GEE extracted data/GEE_mean_NDVI_grid_rnd_2023.csv")
@@ -683,6 +685,7 @@
   grid_pts_nad83 <- st_transform(grid_pts, crs = nad83)
   
   #'  Extract covariates
+  terrain_stack <- c(elev, slope, rough, curve)
   grid_terrain <- terra::extract(terrain_stack, grid_pts_nad83) 
   names(grid_terrain) <- c("ID", "Elevation_m", "Slope_degrees", "Roughness_VRM", "Gaussian_curvature")
   grid_rds <- terra::extract(roads, grid_pts_nad83) %>% rename("Nearest_road_m" = "mosaic_dist2road")
@@ -692,9 +695,11 @@
   #'  Combine covariates into single data frame
   grid_covs <- full_join(grid_terrain, grid_h20, by = "ID") %>%
     full_join(grid_gHM, by = "ID") %>%
-    full_join(grid_rds, by = "ID") %>%
-    full_join(ndvi_grid, by = "ID") %>%
-    mutate(avg_MCP_meanNDVI = avg_MCP_meanNDVI) %>%   ### eventually add canopy cover covs
+    full_join(grid_rds, by = "ID") %>% 
+    full_join(ndvi_grid, by = "ID") %>%              ### eventually add canopy cover covs
+    mutate(avg_MCP_meanNDVI = avg_MCP_meanNDVI) %>%
+    #'  Add centroid coordinates
+    full_join(grid_pts_xy, by = "cellID") %>%
     dplyr::select(-cellID)
   summary(grid_covs)
   
