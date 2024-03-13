@@ -28,6 +28,7 @@
   all_data_rnd <- read_csv("./Data/all_data_rnd.csv")
   
   #'  Load MWEPA masked grid and covariate data
+  grid_covs <- read_csv("./Data/MWEPA_suitable_grid_covs.csv")
   
   #'  --------------------------------
   ####  K-fold training/testing data  ####
