@@ -511,8 +511,8 @@
   all_data_rnd <- get_covs(rnd_locs_nad83, locs_wgs84 = rnd_locs_wgs84, canopy = canopy_rnd, ndvi = ndvi_rnd)
   
   #'  Save covariate data for all used and available locations
-  write_csv(all_data_den, "./Data/all_data_den.csv")
-  write_csv(all_data_rnd, "./Data/all_data_rnd.csv")
+  # write_csv(all_data_den, "./Data/all_data_den.csv")
+  # write_csv(all_data_rnd, "./Data/all_data_rnd.csv")
   # write_csv(all_data_den, "./Data/all_data_den_1to1000ratio.csv")
   # write_csv(all_data_rnd, "./Data/all_data_rnd_1to1000ratio.csv")
   
@@ -670,8 +670,37 @@
   #'  -----------------------------------------
   ####  Extract covariates for reference grid  ####
   #'  -----------------------------------------
+  #'  Load reference grid centroids
   grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp"); crs(grid_pts)
+  #'  Load 2023 rendezvous season NDVI values for entire grid (extracted from GEE 
+  #'  and formatted in Covariate_manipulation.R script)
   ndvi_grid <- read_csv("./Data/GEE extracted data/GEE_mean_NDVI_grid_rnd_2023.csv")
+  names(ndvi_grid) <- c("cellID", "meanNDVI", "ID")
+  #'  Find mean 2023 rendezvous NDVI value across entire grid
+  avg_MCP_meanNDVI <- mean(ndvi_grid$meanNDVI)
+  
+  #'  Reproject grid points
+  grid_pts_nad83 <- st_transform(grid_pts, crs = nad83)
+  
+  #'  Extract covariates
+  grid_terrain <- terra::extract(terrain_stack, grid_pts_nad83) 
+  names(grid_terrain) <- c("ID", "Elevation_m", "Slope_degrees", "Roughness_VRM", "Gaussian_curvature")
+  grid_rds <- terra::extract(roads, grid_pts_nad83) %>% rename("Nearest_road_m" = "mosaic_dist2road")
+  grid_gHM <- terra::extract(human_mod, grid_pts_nad83) %>% rename("Human_mod_index" = "mosaic_global_Human_Modification")
+  grid_h20 <- terra::extract(water, grid_pts) %>% rename("Nearest_water_m" = "Mosaic_Dist2Water")
+  
+  #'  Combine covariates into single data frame
+  grid_covs <- full_join(grid_terrain, grid_h20, by = "ID") %>%
+    full_join(grid_gHM, by = "ID") %>%
+    full_join(grid_rds, by = "ID") %>%
+    full_join(ndvi_grid, by = "ID") %>%
+    mutate(avg_MCP_meanNDVI = avg_MCP_meanNDVI) %>%   ### eventually add canopy cover covs
+    dplyr::select(-cellID)
+  summary(grid_covs)
+  
+  #'  Save
+  write_csv(grid_covs, "./Data/MWEPA_suitable_grid_covs.csv")
+  
   
   
   
