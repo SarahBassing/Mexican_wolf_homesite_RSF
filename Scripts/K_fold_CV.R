@@ -98,9 +98,9 @@
   ####  Train RSFs on training data  ####
   #'  -------------------------------
   #'  Top den model
-  h4.den <- "used ~ Elev + Slope + Rough + Dist2Water + CanopyCov * AvgCanopyCov + HumanMod + Dist2Road"
+  h4.den <- "used ~ Elev + Slope + Rough + Dist2Water + CanopyCov:AvgCanopyCov + HumanMod + Dist2Road"
   #'  Top rendezvous site model
-  h2.rnd <- "used ~ Elev + Rough + Curve + Dist2Water + SeasonalNDVI * AvgSeasonalNDVI"
+  h2.rnd <- "used ~ Elev + Rough + Curve + Dist2Water + SeasonalNDVI:AvgSeasonalNDVI"
   
   #'  Refit model K-fold times
   train_rsf <- function(dat, mod) {
@@ -123,7 +123,7 @@
     dat <- dplyr::select(dat, -c("ID", "Pack_year", "Homesite", "used", "wgts", "geometry"))
     #'  Calculate mean and SD of each covariate
     cov_means <- dat %>%
-      summarise(across(where(is.numeric), mean, na.rm = TRUE))
+      summarise(across(where(is.numeric), \(x) mean(x, na.rm = TRUE)))
     cov_sd <- dat %>%
       summarise(across(where(is.numeric), sd, na.rm = TRUE))
     #'  Bind and return
@@ -139,10 +139,6 @@
   standardize_mwepa_covs <- function(dat, mu.sd) {
     zcovs <- dat %>%
       transmute(ID = ID,
-                Pack_year = Pack_year,
-                Homesite = Homesite,
-                used = used,
-                wgts = wgts,
                 Elev = (Elevation_m - mu.sd$Elevation_m[1])/mu.sd$Elevation_m[2],
                 Slope = (Slope_degrees - mu.sd$Slope_degrees[1])/mu.sd$Slope_degrees[2],
                 Rough = (Roughness_VRM - mu.sd$Roughness_VRM[1])/mu.sd$Roughness_VRM[2],
@@ -152,18 +148,84 @@
                 HumanMod = (Human_mod_index - mu.sd$Human_mod_index[1])/mu.sd$Human_mod_index[2],
                 Dist2Road = (Nearest_road_m - mu.sd$Nearest_road_m[1])/mu.sd$Nearest_road_m[2],
                 # logDist2Road = scale(log(as.numeric(Nearest_road_m))),
-                CanopyCov = (Mean_percent_canopy - mu.sd$Mean_percent_canopy[1])/mu.sd$Mean_percent_canopy[2],
-                AvgCanopyCov = (avg_MCP_canopycover - mu.sd$avg_MCP_canopycover[1])/mu.sd$avg_MCP_canopycover[2],
+                # CanopyCov = (Mean_percent_canopy - mu.sd$Mean_percent_canopy[1])/mu.sd$Mean_percent_canopy[2],
+                # AvgCanopyCov = (avg_MCP_canopycover - mu.sd$avg_MCP_canopycover[1])/mu.sd$avg_MCP_canopycover[2],
                 SeasonalNDVI = (meanNDVI - mu.sd$meanNDVI[1])/mu.sd$meanNDVI[2],
-                AvgSeasonalNDVI = (avg_MCP_meanNDVI - mu.sd$avg_MCP_meanNDVI[1])/mu.sd$avg_MCP_meanNDVI[2])
+                AvgSeasonalNDVI = (avg_MCP_meanNDVI - mu.sd$avg_MCP_meanNDVI[1])/mu.sd$avg_MCP_meanNDVI[2],
+                x = as.numeric(X),
+                y = as.numeric(Y))
     return(zcovs)
   }
-  zcovs_den_mwepa <- lapply(standardize_mwepa_covs, standardize_mwepa_covs, mu.sd = data_den_stats)
-  zcovs_rnd_mwepa <- lapply(standardize_mwepa_covs, standardize_mwepa_covs, mu.sd = data_rnd_stats)
+  zcovs_den_mwepa <- standardize_mwepa_covs(grid_covs, mu.sd = data_den_stats)
+  zcovs_rnd_mwepa <- standardize_mwepa_covs(grid_covs, mu.sd = data_rnd_stats)
   
+  #'  Function to save parameter estimates from each trained model
+  #'  Use coef(mod) to look at random effects estimates
+  rsf_out <- function(mod){
+    beta <- mod$coefficients
+    out <- as.data.frame(beta) %>%
+      mutate(Parameter = row.names(.),
+             Parameter = ifelse(Parameter == "(Intercept)", "alpha", Parameter),
+             Parameter = ifelse(Parameter == "Elev", "b.elev", Parameter),
+             Parameter = ifelse(Parameter == "Slope", "b.slope", Parameter),
+             Parameter = ifelse(Parameter == "Rough", "b.rough", Parameter),
+             Parameter = ifelse(Parameter == "Curve", "b.curve", Parameter),
+             Parameter = ifelse(Parameter == "Dist2Water", "b.water", Parameter),
+             Parameter = ifelse(Parameter == "HumanMod", "b.hm", Parameter),
+             Parameter = ifelse(Parameter == "Dist2Road", "b.road", Parameter),
+             Parameter = ifelse(Parameter == "CanopyCov:AvgCanopyCov", "b.canopyXavgcanopy", Parameter),
+             Parameter = ifelse(Parameter == "SeasonalNDVI:AvgSeasonalNDVI", "b.ndviXavgndvi", Parameter)) %>%
+             # Parameter = ifelse(Parameter == "CanopyCov", "b.canopy", Parameter),
+             # Parameter = ifelse(Parameter == "AvgCanopyCov", "b.avgcanopy", Parameter),
+             # Parameter = ifelse(Parameter == "SeasonalNDVI", "b.ndvi", Parameter),
+             # Parameter = ifelse(Parameter == "AvgSeasonalNDVI", "b.avgndvi", Parameter)) %>%
+      relocate(Parameter, .before = beta) %>%
+      #'  Spread data so each coefficient is it's own column
+      pivot_wider(names_from = Parameter, values_from = beta) 
   
+    return(out)
+  }
+  #'  Extract coefficient estimates for each trained model
+  trained_den_k_coefs <- lapply(trained_den_k, rsf_out)
+  trained_rnd_k_coefs <- lapply(trained_rnd_k, rsf_out)
   
+  #'  Functions to predict across all grid cells based on RSF results
+  #'  Should end up with 1 predicted value per grid cell
+  #'  NOTE: want the predict relative probability of selection from RSF so not 
+  #'  using a logit transformation. Drop intercept from the model and exponentiate 
+  #'  coefs*covs (Fieberg et al. 2020)
+  predict_den_rsf <- function(coef, cov) {
+    predict_rsf <- c()
+    #'  Predict across each grid cell
+    for(i in 1:nrow(cov)) {
+      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.slope*cov$Slope[i] + 
+                              coef$b.rough*cov$Rough[i] + coef$b.water*cov$Dist2Water[i] + 
+                              coef$b.canopy*cov$CanopyCov[i]:coef$b.avgcanopy*cov$AvgCanopyCov[i] + 
+                              coef$b.hm*cov$HumanMod[i] + coef$b.road*cov$Dist2Road[i])}
+    predict_rsf <- as.data.frame(predict_rsf)
+    predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
+    colnames(predict_rsf) <- c("ID", "x", "y", "predict_rsf")
+    
+    return(predict_rsf)
+  }
+  #'  Predict relative probability of selection for den habitat across MWEPA for k training models 
+  den_Kpredict <- lapply(trained_den_k_coefs, predict_den_rsf, cov = zcovs_den_mwepa)
   
+  predict_rnd_rsf <- function(coef, cov) {
+    predict_rsf <- c()
+    #'  Predict across each grid cell
+    for(i in 1:nrow(cov)) {
+      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.rough*cov$Rough[i] + 
+                              coef$b.curve*cov$Curve[i] + coef$b.water*cov$Dist2Water[i] + 
+                              coef$b.ndviXavgndvi*cov$SeasonalNDVI[i]*cov$AvgSeasonalNDVI[i])} #coef$b.ndvi*cov$SeasonalNDVI[i]:coef$b.avgndvi*cov$AvgSeasonalNDVI[i]
+    predict_rsf <- as.data.frame(predict_rsf)
+    predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
+    colnames(predict_rsf) <- c("ID", "x", "y", "predict_rsf")
+    
+    return(predict_rsf)
+  }
+  #'  Predict relative probability of selection for den habitat across MWEPA for k training models 
+  rnd_Kpredict <- lapply(trained_rnd_k_coefs, predict_rnd_rsf, cov = zcovs_rnd_mwepa)
   
   
   
