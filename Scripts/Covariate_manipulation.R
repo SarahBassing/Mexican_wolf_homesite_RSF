@@ -347,6 +347,18 @@
     dplyr::select(-c(`system:index`,`.geo`))
   write_csv(ndvi_grid, "./Data/GEE extracted data/GEE_mean_NDVI_grid_rnd_2023.csv")
   
+  #'  Load reference grid centroids
+  grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp"); crs(grid_pts)
+  grid_pts_xy <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
+  
+  #'  Append NDVI and coordinate data
+  ndvi_coord <- full_join(grid_pts_xy, ndvi_grid)
+  
+  #'  Fill reference grid with NDVI value
+  
+  
+  #'  Plot to make sure this looks correct
+  
   
   #' #####  Surface curvatures  #####
   #' #'  ------------------------
