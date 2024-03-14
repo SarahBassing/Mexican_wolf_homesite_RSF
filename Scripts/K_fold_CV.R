@@ -200,8 +200,9 @@
     for(i in 1:nrow(cov)) {
       predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.slope*cov$Slope[i] + 
                               coef$b.rough*cov$Rough[i] + coef$b.water*cov$Dist2Water[i] + 
-                              coef$b.canopy*cov$CanopyCov[i]:coef$b.avgcanopy*cov$AvgCanopyCov[i] + 
-                              coef$b.hm*cov$HumanMod[i] + coef$b.road*cov$Dist2Road[i])}
+                              coef$b.canopyXavgcanopy*cov$CanopyCov[i]*cov$AvgCanopyCov[i] +   ### REALLY NOT SURE IF THIS IS THE RIGHT WAY TO DO IT...
+                              # coef$b.canopy*cov$CanopyCov[i]:coef$b.avgcanopy*cov$AvgCanopyCov[i] + 
+                              coef$b.hm*cov$HumanMod[i] + coef$b.road*cov$Dist2Road[i])}  
     predict_rsf <- as.data.frame(predict_rsf)
     predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
     colnames(predict_rsf) <- c("ID", "x", "y", "predict_rsf")
@@ -210,6 +211,8 @@
   }
   #'  Predict relative probability of selection for den habitat across MWEPA for k training models 
   den_Kpredict <- lapply(trained_den_k_coefs, predict_den_rsf, cov = zcovs_den_mwepa)
+  
+  save(den_Kpredict, "./Outputs/kfold_predicted_den.RData")
   
   predict_rnd_rsf <- function(coef, cov) {
     predict_rsf <- c()
@@ -227,5 +230,5 @@
   #'  Predict relative probability of selection for den habitat across MWEPA for k training models 
   rnd_Kpredict <- lapply(trained_rnd_k_coefs, predict_rnd_rsf, cov = zcovs_rnd_mwepa)
   
-  
+  save(rnd_Kpredict, "./Outputs/kfold_predicted_rnd.RData")
   
