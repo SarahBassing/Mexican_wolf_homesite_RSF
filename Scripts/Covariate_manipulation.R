@@ -365,13 +365,8 @@
   
   #'  Load reference grid & centroids
   ref_grid <- rast("./Shapefiles/WMEPA_masked_grid.tif"); dim(ref_grid)
-  ref_grid <- setValues(ref_grid, 1:ncell(ref_grid))
+  # ref_grid <- setValues(ref_grid, 1:ncell(ref_grid))
   grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp"); crs(grid_poly)
-  grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp"); crs(grid_pts)
-  grid_pts_xy <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
-  
-  #' #'  turn ndvi_grid into a matrix with dimensions matching ref_grid
-  #' ndvi_matrix <- matrix(ndvi_grid$mean, nrow = dim(ref_grid[1]), ncol = dim(ref_grid[2]))
   
   #'  Append NDVI to polygon sf object
   ndvi_poly <- full_join(grid_poly, ndvi_grid, by = "CellID"); crs(ndvi_poly)
