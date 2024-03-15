@@ -264,6 +264,20 @@
   write_csv(percent_canopy_den, "./Data/GEE extracted data/percent_canopy_denSeason.csv")
   write_csv(percent_canopy_rnd, "./Data/GEE extracted data/percent_canopy_rndSeason.csv")
   
+  #'  Merge pieces of 2000 canopy cover data for entire MWEPA suitable grid
+  canopy_grid <-list.files(path = "./Data/GEE extracted data/MWEPA suitable grid 2000 canopy/", pattern = "\\.csv$", full.names = T) %>%
+    map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
+    dplyr::select(-c(`system:index`,`.geo`))
+  write_csv(canopy_grid, "./Data/GEE extracted data/GEE_2000_canopy_cover_grid.csv")
+  
+  #'  Merge pieces of 2022 canopy loss data for entire MWEPA suitable grid
+  loss_grid <-list.files(path = "./Data/GEE extracted data/MWEPA suitable grid 2022 canopy loss/", pattern = "\\.csv$", full.names = T) %>%
+    map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
+    dplyr::select(-c(`system:index`,`.geo`))
+  write_csv(loss_grid, "./Data/GEE extracted data/GEE_accu_canopy_loss_2022_grid.csv")
+  
+  
+  
   #####  Mean Seasonal Greenness  #####
   #'  ---------------------------
   #'  Derived from MODIS Terra 16-day (2000 - 2023) data
@@ -346,16 +360,23 @@
     map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
     dplyr::select(-c(`system:index`,`.geo`))
   write_csv(ndvi_grid, "./Data/GEE extracted data/GEE_mean_NDVI_grid_rnd_2023.csv")
+  names(ndvi_grid) <- c("CellID", "meanNDVI", "newID")
   
-  #'  Load reference grid centroids
+  #'  Load reference grid & centroids
+  # ref_grid <- rast("./Shapefiles/WMEPA_masked_grid.tif"); dim(ref_grid)
+  # ref_grid <- setValues(ref_grid, 1:ncell(ref_grid))
+  grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp"); crs(grid_poly)
   grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp"); crs(grid_pts)
   grid_pts_xy <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
   
+  #' #'  turn ndvi_grid into a matrix with dimensions matching ref_grid
+  #' ndvi_matrix <- matrix(ndvi_grid$mean, nrow = dim(ref_grid[1]), ncol = dim(ref_grid[2]))
+  
   #'  Append NDVI and coordinate data
-  ndvi_coord <- full_join(grid_pts_xy, ndvi_grid)
+  ndvi_poly <- full_join(grid_poly, ndvi_grid, by = "CellID")
   
   #'  Fill reference grid with NDVI value
-  
+
   
   #'  Plot to make sure this looks correct
   
