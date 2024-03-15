@@ -9,6 +9,7 @@
   #'  Load libraries
   library(sf)
   library(terra)
+  library(stars)
   library(spatialEco)
   library(tidyverse)
   
@@ -363,8 +364,8 @@
   names(ndvi_grid) <- c("CellID", "meanNDVI", "newID")
   
   #'  Load reference grid & centroids
-  # ref_grid <- rast("./Shapefiles/WMEPA_masked_grid.tif"); dim(ref_grid)
-  # ref_grid <- setValues(ref_grid, 1:ncell(ref_grid))
+  ref_grid <- rast("./Shapefiles/WMEPA_masked_grid.tif"); dim(ref_grid)
+  ref_grid <- setValues(ref_grid, 1:ncell(ref_grid))
   grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp"); crs(grid_poly)
   grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp"); crs(grid_pts)
   grid_pts_xy <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
@@ -372,10 +373,21 @@
   #' #'  turn ndvi_grid into a matrix with dimensions matching ref_grid
   #' ndvi_matrix <- matrix(ndvi_grid$mean, nrow = dim(ref_grid[1]), ncol = dim(ref_grid[2]))
   
-  #'  Append NDVI and coordinate data
-  ndvi_poly <- full_join(grid_poly, ndvi_grid, by = "CellID")
+  #'  Append NDVI to polygon sf object
+  ndvi_poly <- full_join(grid_poly, ndvi_grid, by = "CellID"); crs(ndvi_poly)
+  #'  Rename for st_rasterize
+  names(ndvi_poly) <- c("cellID", "value", "newID", "geometry")
   
-  #'  Fill reference grid with NDVI value
+  #'  Rasterize NDVI data
+  #'  Use MWEPA masked grid as the template for rasterizing so the resolution, extent, and coordinate system are correct
+  meanNDVI_2023rnd_raster <- st_rasterize(ndvi_poly %>% dplyr::select(value, geometry), template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), align = TRUE)
+  #'  Save
+  write_stars(meanNDVI_2023rnd_raster, "./Shapefiles/meanNDVI_2023rnd_raster.tif")
+  
+  ndvi_raster <- rast("./Shapefiles/meanNDVI_2023rnd_raster.tif"); res(ndvi_raster); crs(ndvi_raster)
+  plot(ndvi_raster)
+  
+  
 
   
   #'  Plot to make sure this looks correct
