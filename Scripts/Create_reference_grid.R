@@ -79,7 +79,10 @@
   
   #'  Convert grid to a polygon and sf object #### THIS TAKES FOREVER!!!
   wmepa_poly <- as.polygons(wmepa_grid)    
+  # wmepa_poly <- as.polygons(wmepa_grid, aggregate = FALSE, values = TRUE, extent = TRUE, na.rm = TRUE) 
   wmepa_poly_sf <- st_as_sf(wmepa_poly)
+  # one_cell <- wmepa_poly_sf[1,]
+  # st_area(one_cell)
   
   #'  Save so I never have to do that again!
   st_write(wmepa_poly_sf, "./Shapefiles/WMEPA_masked_polygon.shp")
