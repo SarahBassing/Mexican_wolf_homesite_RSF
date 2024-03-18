@@ -681,6 +681,11 @@
   #'  Find mean 2023 rendezvous NDVI value across entire grid
   avg_MCP_meanNDVI <- mean(ndvi_grid$meanNDVI)
   
+  #'  Load 2022 canopy cover values for entire grid (extracted from GEE and formatted
+  #'  in Covariate_manipulation.R script)
+  canopy_grid <- read_csv("./Data/GEE extracted data/GEE_percent_canopy_2022_grid.csv")
+  names(canopy_grid) <- c("cellID", "ID", "Mean_percent_canopy", "avg_MWEPA_canopycover")
+  
   #'  Reproject grid points
   grid_pts_nad83 <- st_transform(grid_pts, crs = nad83)
   
@@ -696,8 +701,9 @@
   grid_covs <- full_join(grid_terrain, grid_h20, by = "ID") %>%
     full_join(grid_gHM, by = "ID") %>%
     full_join(grid_rds, by = "ID") %>% 
-    full_join(ndvi_grid, by = "ID") %>%              ### eventually add canopy cover covs
+    full_join(ndvi_grid, by = "ID") %>% 
     mutate(avg_MCP_meanNDVI = avg_MCP_meanNDVI) %>%
+    full_join(canopy_grid, by = c("cellID", "ID")) %>% 
     #'  Add centroid coordinates
     full_join(grid_pts_xy, by = "cellID") %>%
     dplyr::select(-cellID)
