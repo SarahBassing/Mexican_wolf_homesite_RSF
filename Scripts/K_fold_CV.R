@@ -150,8 +150,10 @@
                 # logDist2Road = scale(log(as.numeric(Nearest_road_m))),
                 CanopyCov = (Mean_percent_canopy - mu.sd$Mean_percent_canopy[1])/mu.sd$Mean_percent_canopy[2],
                 AvgCanopyCov = (avg_MWEPA_canopycover - mu.sd$avg_MCP_canopycover[1])/mu.sd$avg_MCP_canopycover[2],
+                ModifiedCanopyCov = CanopyCov*AvgCanopyCov,
                 SeasonalNDVI = (meanNDVI - mu.sd$meanNDVI[1])/mu.sd$meanNDVI[2],
                 AvgSeasonalNDVI = (avg_MCP_meanNDVI - mu.sd$avg_MCP_meanNDVI[1])/mu.sd$avg_MCP_meanNDVI[2],
+                ModifiedNDVI = SeasonalNDVI * AvgSeasonalNDVI,
                 x = as.numeric(X),
                 y = as.numeric(Y))
     return(zcovs)
@@ -195,12 +197,14 @@
   #'  using a logit transformation. Drop intercept from the model and exponentiate 
   #'  coefs*covs (Fieberg et al. 2020)
   predict_den_rsf <- function(coef, cov) {
+    #'  Generate modified canopy cover variable
+    
     predict_rsf <- c()
     #'  Predict across each grid cell
     for(i in 1:nrow(cov)) {
       predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.slope*cov$Slope[i] + 
                               coef$b.rough*cov$Rough[i] + coef$b.water*cov$Dist2Water[i] + 
-                              coef$b.canopyXavgcanopy*cov$CanopyCov[i]*cov$AvgCanopyCov[i] +   ### REALLY NOT SURE IF THIS IS THE RIGHT WAY TO DO IT...
+                              coef$b.canopyXavgcanopy*cov$ModifiedCanopyCov[i] + 
                               coef$b.hm*cov$HumanMod[i] + coef$b.road*cov$Dist2Road[i])}  
     predict_rsf <- as.data.frame(predict_rsf)
     predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
@@ -220,7 +224,7 @@
     for(i in 1:nrow(cov)) {
       predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.rough*cov$Rough[i] + 
                               coef$b.curve*cov$Curve[i] + coef$b.water*cov$Dist2Water[i] + 
-                              coef$b.ndviXavgndvi*cov$SeasonalNDVI[i]*cov$AvgSeasonalNDVI[i])} #coef$b.ndvi*cov$SeasonalNDVI[i]:coef$b.avgndvi*cov$AvgSeasonalNDVI[i]
+                              coef$b.ndviXavgndvi*cov$ModifiedNDVI[i])}
     predict_rsf <- as.data.frame(predict_rsf)
     predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
     colnames(predict_rsf) <- c("ID", "x", "y", "predict_rsf")
