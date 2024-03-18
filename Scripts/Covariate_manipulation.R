@@ -1,9 +1,13 @@
   #'  -----------------------------
-  #'  Generate spatial covariates 
+  #'  Generate/reformat covariates
+  #'  Mexican wolf project
+  #'  Sarah B. Bassing
   #'  January 2024
   #'  -----------------------------
-  #'  Load DEM, seasonal NDVI, and annual forest cover. Generate new terrain variables
-  #'  and format NDVI/forest data for easier extraction.
+  #'  Load DEM, habiat suitability, and GEE extracted seasonal NDVI and annual canopy 
+  #'  cover data. Generate vector ruggedness measurement (VRM) from elevation data,
+  #'  create shapefile of area considered "suitable habitat" by Martinez-Meyer et 
+  #'  al. 2021, reformat NDVI data, and calculate annual canopy cover.
   #'  -----------------------------
   
   #'  Load libraries
@@ -13,9 +17,9 @@
   library(spatialEco)
   library(tidyverse)
   
-  #'  --------------------
-  ####  Load raster data  ####
-  #'  --------------------
+  #'  -------------------------
+  ####  Load elevation raster  ####
+  #'  -------------------------
   #'  Load spatial data
   dem <- terra::rast("./Shapefiles/Terrain_variables/Mosaic_DEM.tif"); res(dem); st_crs(dem)
   
@@ -149,6 +153,7 @@
   
   #'  Brief look
   head(mean_canopy_den); head(canopy_loss_den)
+  bufferedArea <- max(canopy_loss_den$BufferArea_sq_m)
   
   #'  Reformat and update canopy cover based on years when canopy loss occurred
   canopy_loss_den_reformat <- canopy_loss_den %>%
@@ -265,6 +270,8 @@
   write_csv(percent_canopy_den, "./Data/GEE extracted data/percent_canopy_denSeason.csv")
   write_csv(percent_canopy_rnd, "./Data/GEE extracted data/percent_canopy_rndSeason.csv")
   
+  ######  2022 canopy cover MWEPA grid  ######
+  #'  ----------------------------------
   #'  Merge pieces of 2000 canopy cover data for entire MWEPA suitable grid
   canopy_grid <-list.files(path = "./Data/GEE extracted data/MWEPA suitable grid 2000 canopy/", pattern = "\\.csv$", full.names = T) %>%
     map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
@@ -277,7 +284,35 @@
     dplyr::select(-c(`system:index`,`.geo`))
   write_csv(loss_grid, "./Data/GEE extracted data/GEE_accu_canopy_loss_2022_grid.csv")
   
+  #'  Calculate 2022 canopy cover using 2000 baseline and accumulated loss area
+  percent_canopy_2022_grid <- full_join(canopy_grid, loss_grid, by = c("cellID", "newID")) %>%
+    mutate(BufferArea_sq_m = bufferedArea) %>%
+    rename("lossYr_2022" = "sum") %>% #"CanopyLossArea_sq_m" 
+    rename("Mean_canopy_cover_2000" = "mean") %>%
+    relocate(newID, .after = cellID) %>%
+    #'  Make sure canopy cover and area loss are numeric
+    mutate(Mean_canopy_cover_2000 = as.numeric(Mean_canopy_cover_2000),
+           lossYr_2022 = as.numeric(lossYr_2022),
+           #'  Put mean % canopy cover in a real percentage
+           Mean_2000_CC_percent = Mean_canopy_cover_2000/100,
+           #'  Calculate proportion of area within buffer that was lost over time
+           PropLost = lossYr_2022/BufferArea_sq_m,
+           #'  Calculate accumulated percentage of area in buffer lost over time
+           PercentLost = PropLost * Mean_2000_CC_percent,
+           #'  Adjust mean % canopy cover from 2000 by percentage of area lost up to 2022
+           Mean_percent_canopy = Mean_2000_CC_percent - PercentLost) %>%
+    rename("canopy_cov_2000" = "Mean_2000_CC_percent") %>%
+    relocate(canopy_cov_2000, .after = Mean_canopy_cover_2000) %>%
+    dplyr::select(cellID, newID, Mean_percent_canopy)
   
+  #'  2022 canopy cover, averaged across entire study area
+  mean_cover_2022_grid <- mean(percent_canopy_2022_grid$Mean_percent_canopy) 
+  
+  #'  Add 2022 study area average canopy cover to 2022 canopy cover data set
+  percent_canopy_grid <- percent_canopy_2022_grid %>%
+    mutate(avg_MWEPA_canopycover = mean_cover_2022_grid)
+  
+  write_csv(percent_canopy_grid, "./Data/GEE extracted data/GEE_percent_canopy_2022_grid.csv")
   
   #####  Mean Seasonal Greenness  #####
   #'  ---------------------------
@@ -356,6 +391,8 @@
   write_csv(ndvi_den, "./Data/GEE extracted data/mean_NDVI_denSeason.csv")
   write_csv(ndvi_rnd, "./Data/GEE extracted data/mean_NDVI_rndSeason.csv")
   
+  ######  2023 Rendezvous NDVI MWEPA grid  ######
+  #'  -------------------------------------
   #'  Merge pieces of 2023 rendezvous NDVI data for entire MWEPA suitable grid
   ndvi_grid <-list.files(path = "./Data/GEE extracted data/MWEPA suitable grid NDVI/", pattern = "\\.csv$", full.names = T) %>%
     map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
@@ -381,79 +418,5 @@
   
   ndvi_raster <- rast("./Shapefiles/meanNDVI_2023rnd_raster.tif"); res(ndvi_raster); crs(ndvi_raster)
   plot(ndvi_raster)
-  
-  
-
-  
-  #'  Plot to make sure this looks correct
-  
-  
-  #' #####  Surface curvatures  #####
-  #' #'  ------------------------
-  #' #'  Gaussian curvature and Profile curvature
-  #' #'  Code adapted from spatialEco curvature function (https://rdrr.io/cran/spatialEco/src/R/curvature.R)
-  #' #'  and curvature equations defined in Minar et al. 2020
-  #' my_curves <- function(x, type = c("planform", "profile", "total", "gaussian", "mcnab", "bolstad"), ...) { 
-  #'   if(!inherits(x, "SpatRaster"))
-  #'     stop(deparse(substitute(x)), " must be a terra SpatRaster object")
-  #'   m <- matrix(1, nrow=3, ncol=3)
-  #'   type = type[1] 
-  #'   if(!any(c("planform", "profile", "total", "gaussian", "mcnab", "bolstad") %in% type)  )
-  #'     stop("Not a valid curvature option")	
-  #'   zt.crv <- function(m, method = type, res = terra::res(x)[1]) {
-  #'     p=(m[6]-m[4])/(2*res)
-  #'     q=(m[2]-m[8])/(2*res)
-  #'     r=(m[4]+m[6]-2*m[5])/(2*(res^2))
-  #'     s=(m[3]+m[7]-m[1]-m[9])/(4*(res^2))
-  #'     tx=(m[2]+m[8]-2*m[5])/(2*(res^2))
-  #'     if(type == "planform") {
-  #'       crv <- round( -(q^2*r-2*p*q*s+p^2*tx)/((p^2+q^2)*sqrt(1+p^2+q^2)),6) 
-  #'     } else if(type == "profile") {
-  #'       crv <- round( -(p^2*r+2*p*q*s+q^2*tx)/((p^2+q^2)*sqrt(1+p^2+q^2)^3),6 )
-  #'     } else if(type == "total") {
-  #'       crv <- round( -(q^2*r-2*p*q*s+p^2*tx)/((p^2+q^2)*sqrt(1+p^2+q^2)),6) + 
-  #'         round( -(p^2*r+2*p*q*s+q^2*tx)/((p^2+q^2)*sqrt(1+p^2+q^2)^3),6 )  
-  #'     } else if(type == "gaussian"){
-  #'       crv <- round( -(r*tx-s^2)/((1+p^2+q^2)^2),6 )
-  #'     }
-  #'     return(crv)
-  #'   }  	
-  #'   if(type == "bolstad") {
-  #'     return( 10000 * ((x - terra::focal(x, w=m, fun=mean, ...)) / 1000 /
-  #'                        (terra::res[1] + terra::res[1]/2) ) )
-  #'   } else if(type == "mcnab") {
-  #'       mcnab <- function(x) {
-  #'       m <- ceiling(length(x)/2)
-  #'       sum(x[m] - x[-m], na.rm=TRUE) / length(x)-1
-  #'     }
-  #'     tidx <- mask(terra::focal(x, w=m, fun=mcnab, ...), x)
-  #'     return( tidx / as.numeric(terra::global(tidx, "max", na.rm=TRUE)) )
-  #'   }
-  #'   else {
-  #'     return( terra::focal(x, w=m, fun = zt.crv, fillvalue = 0, ...) )
-  #'   }
-  #' }	
-  #' gaus_curv <- my_curves(dem, type = "gaussian")
-  #' plot(gaus_curv)
-  #' writeRaster(gaus_curv, "./Shapefiles/Terrain_variables/Gaussian_curvature.tif", overwrite = TRUE)
-  #' 
-  #' # Converting Minar parameters to spatialEco parameters 
-  #' # p = x
-  #' # q = y
-  #' # r = xx
-  #' # s = xy
-  #' # tx = yy
-  #' 
-  #' #'  Profile curvature: second derivative of elevation surface (slope of the slope)
-  #' #'  i.e., direction of the maximum slope where (-) values indicate surface is 
-  #' #'  upwardly convex and (+) values indicate surface is upwardly concave. Values
-  #' #'  of 0 indicate flat surface.
-  #' profcurv <- curvature(dem, type = "profile")
-  #' writeRaster(profcurv, "./Shapefiles/Terrain_variables/Profile_curvature.tif", overwrite = TRUE)
-  
-  
-  
-  
-  
   
   
