@@ -125,7 +125,7 @@
     cov_means <- dat %>%
       summarise(across(where(is.numeric), \(x) mean(x, na.rm = TRUE)))
     cov_sd <- dat %>%
-      summarise(across(where(is.numeric), sd, na.rm = TRUE))
+      summarise(across(where(is.numeric), \(x) sd(x, na.rm = TRUE)))
     #'  Bind and return
     cov_stats <- bind_rows(cov_means, cov_sd) 
     cov_stats <- as.data.frame(cov_stats)
@@ -148,8 +148,8 @@
                 HumanMod = (Human_mod_index - mu.sd$Human_mod_index[1])/mu.sd$Human_mod_index[2],
                 Dist2Road = (Nearest_road_m - mu.sd$Nearest_road_m[1])/mu.sd$Nearest_road_m[2],
                 # logDist2Road = scale(log(as.numeric(Nearest_road_m))),
-                # CanopyCov = (Mean_percent_canopy - mu.sd$Mean_percent_canopy[1])/mu.sd$Mean_percent_canopy[2],
-                # AvgCanopyCov = (avg_MCP_canopycover - mu.sd$avg_MCP_canopycover[1])/mu.sd$avg_MCP_canopycover[2],
+                CanopyCov = (Mean_percent_canopy - mu.sd$Mean_percent_canopy[1])/mu.sd$Mean_percent_canopy[2],
+                AvgCanopyCov = (avg_MWEPA_canopycover - mu.sd$avg_MCP_canopycover[1])/mu.sd$avg_MCP_canopycover[2],
                 SeasonalNDVI = (meanNDVI - mu.sd$meanNDVI[1])/mu.sd$meanNDVI[2],
                 AvgSeasonalNDVI = (avg_MCP_meanNDVI - mu.sd$avg_MCP_meanNDVI[1])/mu.sd$avg_MCP_meanNDVI[2],
                 x = as.numeric(X),
@@ -201,7 +201,6 @@
       predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.slope*cov$Slope[i] + 
                               coef$b.rough*cov$Rough[i] + coef$b.water*cov$Dist2Water[i] + 
                               coef$b.canopyXavgcanopy*cov$CanopyCov[i]*cov$AvgCanopyCov[i] +   ### REALLY NOT SURE IF THIS IS THE RIGHT WAY TO DO IT...
-                              # coef$b.canopy*cov$CanopyCov[i]:coef$b.avgcanopy*cov$AvgCanopyCov[i] + 
                               coef$b.hm*cov$HumanMod[i] + coef$b.road*cov$Dist2Road[i])}  
     predict_rsf <- as.data.frame(predict_rsf)
     predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
@@ -211,8 +210,9 @@
   }
   #'  Predict relative probability of selection for den habitat across MWEPA for k training models 
   den_Kpredict <- lapply(trained_den_k_coefs, predict_den_rsf, cov = zcovs_den_mwepa)
+  head(den_Kpredict[[1]]); head(den_Kpredict[[7]])
   
-  save(den_Kpredict, "./Outputs/kfold_predicted_den.RData")
+  save(den_Kpredict, file = "./Outputs/kfold_predicted_den.RData")
   
   predict_rnd_rsf <- function(coef, cov) {
     predict_rsf <- c()
@@ -227,8 +227,9 @@
     
     return(predict_rsf)
   }
-  #'  Predict relative probability of selection for den habitat across MWEPA for k training models 
+  #'  Predict relative probability of selection for rendezvous habitat across MWEPA for k training models 
   rnd_Kpredict <- lapply(trained_rnd_k_coefs, predict_rnd_rsf, cov = zcovs_rnd_mwepa)
+  head(rnd_Kpredict[[1]]); head(rnd_Kpredict[[10]])
   
-  save(rnd_Kpredict, "./Outputs/kfold_predicted_rnd.RData")
+  save(rnd_Kpredict, file = "./Outputs/kfold_predicted_rnd.RData")
   
