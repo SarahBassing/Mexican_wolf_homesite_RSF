@@ -138,7 +138,8 @@
   #'  Standardize based on mean and SD of covariates in original model
   standardize_mwepa_covs <- function(dat, mu.sd) {
     zcovs <- dat %>%
-      transmute(ID = ID,
+      transmute(cellID = cellID,
+                ID = ID,
                 Elev = (Elevation_m - mu.sd$Elevation_m[1])/mu.sd$Elevation_m[2],
                 Slope = (Slope_degrees - mu.sd$Slope_degrees[1])/mu.sd$Slope_degrees[2],
                 Rough = (Roughness_VRM - mu.sd$Roughness_VRM[1])/mu.sd$Roughness_VRM[2],
@@ -265,11 +266,13 @@
   #'  Load reference raster and identify coordinate system
   ref_raster <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif"); res(ref_raster); crs(ref_raster)
   grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp") # THIS TAKES AWHILE
+  wmepa_grid_pts <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
   nad83 <- st_crs(ref_raster)
+  wmepa_grid_pts <- st_as_sf(wmepa_grid_pts, coords = c("X", "Y"), crs = nad83) 
   
   #'  Reclassify RSF predictions into 10 equal area bins (Boyce et al. 2002) and rasterize
   #'  Robust to extreme outlier on either end of distribution
-  reclassify_RSF <- function(dat) {
+  reclassify_RSF <- function(dat, covs) {
     #'  Create 10 breaks for bins of equal area
     bin_rsf <- quantile(dat$predict_rsf, seq(0, 1, by = 0.1))
     print(bin_rsf)
@@ -283,21 +286,35 @@
     #'  Double check bins are of equal size
     print(table(dat$bins))
     
+    #'  Grab cellID from covs and add to dat
+    cellID <- dplyr::select(covs, c("cellID", "ID"))
+    dat <- full_join(dat, cellID, by = "ID")
+    
     #'  Convert to sf object
-    dat_poly <- full_join(grid_poly, dat, by = "cellID"); crs(dat_poly)
+    dat_poly <- full_join(wmepa_grid_pts, dat, by = "cellID") %>%  
+      # full_join(grid_poly, dat, by = c("CellID" = "cellID"))
+      # dplyr::select(c("CellID", "bins")) %>% rename("value" = "bins")
+      dplyr::select(c("cellID", "bins")) %>% rename("x" = "bins"); crs(dat_poly)
+    # dat_poly <- full_join(grid_poly, dat, by = c("CellID" = "cellID"))
+    # dplyr::select(c("CellID", "bins")) %>% rename("value" = "bins")
+    
+    dat_vect <- vect(dat_poly)
+    predicted_raster <- rasterize(dat_vect, ref_rast, field = "x")
     
     # dat <- st_as_sf(dat, coords = c("x", "y"), crs = nad83)
     # names(dat) <- c("ID", "predict_rsf", "equal_area_bins", "value", "geometry")
     
-    #'  Rasterize predictions
-    predicted_raster <- st_rasterize(dat_poly %>% dplyr::select(bins, geometry), 
-                                     template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), 
-                                     align = TRUE)
+    #' #'  Rasterize predictions
+    #' predicted_raster <- dat_poly %>% 
+    #'   dplyr::select(c(bins, geometry)) %>%
+    #'   st_rasterize(st_as_stars(st_bbox(ref_raster), nx = nrow(ref_raster), ny = ncol(ref_raster)))
+    #' #template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), #template = st_as_stars(ref_raster)
+    #'                #align = TRUE)
     
     return(dat)
   }
-  den_Kpredict_binned <- lapply(den_Kpredict, reclassify_RSF); head(den_Kpredict_binned[[1]])
-  rnd_Kpredict_binned <- lapply(rnd_Kpredict, reclassify_RSF)
+  den_Kpredict_binned <- lapply(den_Kpredict, reclassify_RSF, covs = zcovs_den_mwepa); head(den_Kpredict_binned[[1]])
+  rnd_Kpredict_binned <- lapply(rnd_Kpredict, reclassify_RSF, covs = zcovs_rnd_mwepa)
   
   #'  -----------------------
   ####  Cross-validate RSFs  ####
