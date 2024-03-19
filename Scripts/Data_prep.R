@@ -706,7 +706,7 @@
     full_join(canopy_grid, by = c("cellID", "ID")) %>% 
     #'  Add centroid coordinates
     full_join(grid_pts_xy, by = "cellID") %>%
-    dplyr::select(cellID)
+    relocate(cellID, .before = ID)
   summary(grid_covs)
   
   #'  Save
