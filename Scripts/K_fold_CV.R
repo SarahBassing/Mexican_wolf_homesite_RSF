@@ -17,9 +17,9 @@
   #'  Load packages
   library(car)
   library(groupdata2)
-  # library(knitr)
   library(sf)
   library(terra)
+  library(stars)
   library(ggplot2)
   library(tidyverse)
   
@@ -98,9 +98,9 @@
   ####  Train RSFs on training data  ####
   #'  -------------------------------
   #'  Top den model
-  h4.den <- "used ~ Elev + Slope + Rough + Dist2Water + CanopyCov:AvgCanopyCov + HumanMod + Dist2Road"
+  h4.den <- "used ~ Elev + Slope + Rough + Dist2Water + CanopyCov + CanopyCov:AvgCanopyCov + HumanMod + Dist2Road"
   #'  Top rendezvous site model
-  h2.rnd <- "used ~ Elev + Rough + Curve + Dist2Water + SeasonalNDVI:AvgSeasonalNDVI"
+  h2.rnd <- "used ~ Elev + Rough + Curve + Dist2Water + SeasonalNDVI + SeasonalNDVI:AvgSeasonalNDVI"
   
   #'  Refit model K-fold times
   train_rsf <- function(dat, mod) {
@@ -175,12 +175,10 @@
              Parameter = ifelse(Parameter == "Dist2Water", "b.water", Parameter),
              Parameter = ifelse(Parameter == "HumanMod", "b.hm", Parameter),
              Parameter = ifelse(Parameter == "Dist2Road", "b.road", Parameter),
+             Parameter = ifelse(Parameter == "CanopyCov", "b.canopy", Parameter),
              Parameter = ifelse(Parameter == "CanopyCov:AvgCanopyCov", "b.canopyXavgcanopy", Parameter),
+             Parameter = ifelse(Parameter == "SeasonalNDVI", "b.ndvi", Parameter),
              Parameter = ifelse(Parameter == "SeasonalNDVI:AvgSeasonalNDVI", "b.ndviXavgndvi", Parameter)) %>%
-             # Parameter = ifelse(Parameter == "CanopyCov", "b.canopy", Parameter),
-             # Parameter = ifelse(Parameter == "AvgCanopyCov", "b.avgcanopy", Parameter),
-             # Parameter = ifelse(Parameter == "SeasonalNDVI", "b.ndvi", Parameter),
-             # Parameter = ifelse(Parameter == "AvgSeasonalNDVI", "b.avgndvi", Parameter)) %>%
       relocate(Parameter, .before = beta) %>%
       #'  Spread data so each coefficient is it's own column
       pivot_wider(names_from = Parameter, values_from = beta) 
@@ -204,6 +202,7 @@
     for(i in 1:nrow(cov)) {
       predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.slope*cov$Slope[i] + 
                               coef$b.rough*cov$Rough[i] + coef$b.water*cov$Dist2Water[i] + 
+                              coef$b.canopy*cov$CanopyCov[i] + 
                               coef$b.canopyXavgcanopy*cov$ModifiedCanopyCov[i] + 
                               coef$b.hm*cov$HumanMod[i] + coef$b.road*cov$Dist2Road[i])}  
     predict_rsf <- as.data.frame(predict_rsf)
@@ -224,7 +223,7 @@
     for(i in 1:nrow(cov)) {
       predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.rough*cov$Rough[i] + 
                               coef$b.curve*cov$Curve[i] + coef$b.water*cov$Dist2Water[i] + 
-                              coef$b.ndviXavgndvi*cov$ModifiedNDVI[i])}
+                              coef$b.ndvi*cov$SeasonalNDVI[i] + coef$b.ndviXavgndvi*cov$ModifiedNDVI[i])}
     predict_rsf <- as.data.frame(predict_rsf)
     predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
     colnames(predict_rsf) <- c("ID", "x", "y", "predict_rsf")
@@ -236,4 +235,92 @@
   head(rnd_Kpredict[[1]]); head(rnd_Kpredict[[10]])
   
   save(rnd_Kpredict, file = "./Outputs/kfold_predicted_rnd.RData")
+  
+  #'  ---------------------------------------
+  ####  Equal area bins for RSF predictions  ####
+  #'  ---------------------------------------
+  #' #'  Identify outliers in the predictions
+  #' outliers <- function(predicted) { 
+  #'   #'  Summarize predicted values
+  #'   hist(predicted$predict_rsf, breaks = 100)
+  #'   boxplot(predicted$predict_rsf)
+  #'   #'  What value represents the 99th percentile in the predicted RSF values
+  #'   quant <- quantile(predicted$predict_rsf, c(0.99), na.rm = TRUE)
+  #'   #'  Print that value and maximum prediction
+  #'   print(quant); print(max(predicted$predict_rsf, na.rm = TRUE))
+  #'   #'  Identify the 1% most extreme values and set to 99th percentile value
+  #'   predicted <- predicted %>%
+  #'     mutate(outlier = ifelse(predict_rsf > quant, "outlier", "not_outlier"),
+  #'            adjusted_rsf = ifelse(outlier == "outlier", quant, predict_rsf))
+  #'   #'  How many predicted values are above the 99th percentile?
+  #'   outlier <- predicted[predicted$outlier == "outlier",]
+  #'   outlier <- filter(outlier, !is.na(outlier))
+  #'   print(nrow(outlier))
+  #'   
+  #'   return(predicted)
+  #' }
+  #' den_Kpredict_outliers <- lapply(den_Kpredict, outliers)
+  #' rnd_Kpredict_outliers <- lapply(rnd_Kpredict, outliers)
+  
+  #'  Load reference raster and identify coordinate system
+  ref_raster <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif"); res(ref_raster); crs(ref_raster)
+  grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp") # THIS TAKES AWHILE
+  nad83 <- st_crs(ref_raster)
+  
+  #'  Reclassify RSF predictions into 10 equal area bins (Boyce et al. 2002) and rasterize
+  #'  Robust to extreme outlier on either end of distribution
+  reclassify_RSF <- function(dat) {
+    #'  Create 10 breaks for bins of equal area
+    bin_rsf <- quantile(dat$predict_rsf, seq(0, 1, by = 0.1))
+    print(bin_rsf)
+    
+    #'  Cut predicted RSF values into bins based on break points
+    dat$equal_area_bins <- cut(dat$predict_rsf, breaks = bin_rsf, include.lowest = TRUE)
+    #'  Same thing but relable them to something more useful
+    dat$bins <- cut(dat$predict_rsf, breaks = bin_rsf, include.lowest = TRUE,
+                    labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"))
+   
+    #'  Double check bins are of equal size
+    print(table(dat$bins))
+    
+    #'  Convert to sf object
+    dat_poly <- full_join(grid_poly, dat, by = "cellID"); crs(dat_poly)
+    
+    # dat <- st_as_sf(dat, coords = c("x", "y"), crs = nad83)
+    # names(dat) <- c("ID", "predict_rsf", "equal_area_bins", "value", "geometry")
+    
+    #'  Rasterize predictions
+    predicted_raster <- st_rasterize(dat_poly %>% dplyr::select(bins, geometry), 
+                                     template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), 
+                                     align = TRUE)
+    
+    return(dat)
+  }
+  den_Kpredict_binned <- lapply(den_Kpredict, reclassify_RSF); head(den_Kpredict_binned[[1]])
+  rnd_Kpredict_binned <- lapply(rnd_Kpredict, reclassify_RSF)
+  
+  #'  -----------------------
+  ####  Cross-validate RSFs  ####
+  #'  -----------------------
+  #'  Set projection 
+  wgs84 <- "+proj=longlat +datum=WGS84 +no_defs"
+  
+  #'  Retain used locations from each training data set
+  testing_pts <- function(test_dat) {
+    used_locs <- test_dat %>%
+      filter(used == 1) %>%
+      dplyr::select(c(Pack_year, used, .folds, geometry)) %>%
+      mutate(geometry = gsub("[()]", "", geometry)) %>%
+      #'  Split geometry into two columns
+      separate_wider_delim(cols = geometry, delim = ',', names = c("x", "y")) %>%
+      mutate(x = gsub(".*c", "", x)) %>%
+    #'  Convert to sf object
+    st_as_sf(coords = c("x", "y"), crs = wgs84)
+    return(used_locs)
+  }
+  testing_pts_den_k <- lapply(data_den_k[[2]], testing_pts); head(testing_pts_den_k[[1]])
+  testing_rnd_den_k <- lapply(data_rnd_k[[2]], testing_pts)
+  
+  
+  
   
