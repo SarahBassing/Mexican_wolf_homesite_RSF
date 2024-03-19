@@ -171,4 +171,19 @@
   #'  No difference in which covariates are significant between h2.rnd & h4.rnd
   #'  so going to conduct k-fold cv on h2.rnd since more parsimonious model
   
+  #'  ------------------
+  ####  Results tables  ####
+  #'  ------------------
+  
+  #'  ----------------
+  ####  Plot results  ####
+  #'  ----------------
+  
+  #'  -------------------------------------------
+  ####  Predict across suitable habitat and map  ####
+  #'  -------------------------------------------
+  
+  
+  
+  
   
