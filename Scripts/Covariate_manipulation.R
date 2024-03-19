@@ -287,7 +287,7 @@
   #'  Calculate 2022 canopy cover using 2000 baseline and accumulated loss area
   percent_canopy_2022_grid <- full_join(canopy_grid, loss_grid, by = c("cellID", "newID")) %>%
     mutate(BufferArea_sq_m = bufferedArea) %>%
-    rename("lossYr_2022" = "sum") %>% #"CanopyLossArea_sq_m" 
+    rename("lossYr_2022" = "sum") %>% 
     rename("Mean_canopy_cover_2000" = "mean") %>%
     relocate(newID, .after = cellID) %>%
     #'  Make sure canopy cover and area loss are numeric
