@@ -414,9 +414,9 @@
   #'  Use MWEPA masked grid as the template for rasterizing so the resolution, extent, and coordinate system are correct
   meanNDVI_2023rnd_raster <- st_rasterize(ndvi_poly %>% dplyr::select(value, geometry), template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), align = TRUE)
   #'  Save
-  write_stars(meanNDVI_2023rnd_raster, "./Shapefiles/meanNDVI_2023rnd_raster.tif")
+  write_stars(meanNDVI_2023rnd_raster, "./Shapefiles/meanNDVI_2023rnd_raster2.tif")
   
-  ndvi_raster <- rast("./Shapefiles/meanNDVI_2023rnd_raster.tif"); res(ndvi_raster); crs(ndvi_raster)
+  ndvi_raster <- rast("./Shapefiles/meanNDVI_2023rnd_raster2.tif"); res(ndvi_raster); crs(ndvi_raster)
   plot(ndvi_raster)
   
   
