@@ -20,6 +20,7 @@
   library(sf)
   library(terra)
   library(stars)
+  library(sp)
   library(ggplot2)
   library(tidyverse)
   
@@ -290,31 +291,50 @@
     cellID <- dplyr::select(covs, c("cellID", "ID"))
     dat <- full_join(dat, cellID, by = "ID")
     
-    #'  Convert to sf object
-    dat_poly <- full_join(wmepa_grid_pts, dat, by = "cellID") %>%  
-      # full_join(grid_poly, dat, by = c("CellID" = "cellID"))
-      # dplyr::select(c("CellID", "bins")) %>% rename("value" = "bins")
-      dplyr::select(c("cellID", "bins")) %>% rename("x" = "bins"); crs(dat_poly)
-    # dat_poly <- full_join(grid_poly, dat, by = c("CellID" = "cellID"))
-    # dplyr::select(c("CellID", "bins")) %>% rename("value" = "bins")
+    #' #'  Convert to sf object
+    #' dat_sf <- full_join(wmepa_grid_pts, dat, by = "cellID") #%>%  
+    #' #   # full_join(grid_poly, dat, by = c("CellID" = "cellID"))
+    #' #   # dplyr::select(c("CellID", "bins")) %>% rename("value" = "bins")
+    #' #   dplyr::select("bins") %>% rename("x" = "bins"); crs(dat_poly)
+    #' # # dat_poly <- full_join(grid_poly, dat, by = c("CellID" = "cellID"))
+    #' # # dplyr::select(c("CellID", "bins")) %>% rename("value" = "bins")
+    #' dat_sp <- as_Spatial(dat_sf)
     
-    dat_vect <- vect(dat_poly)
-    predicted_raster <- rasterize(dat_vect, ref_rast, field = "x")
-    
-    # dat <- st_as_sf(dat, coords = c("x", "y"), crs = nad83)
-    # names(dat) <- c("ID", "predict_rsf", "equal_area_bins", "value", "geometry")
-    
-    #' #'  Rasterize predictions
-    #' predicted_raster <- dat_poly %>% 
-    #'   dplyr::select(c(bins, geometry)) %>%
-    #'   st_rasterize(st_as_stars(st_bbox(ref_raster), nx = nrow(ref_raster), ny = ncol(ref_raster)))
-    #' #template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), #template = st_as_stars(ref_raster)
-    #'                #align = TRUE)
+    #' dat_vect <- vect(dat_sp)
+    #' predicted_raster <- rasterize(dat_vect, ref_raster, field = "x")
+    #' 
+    #' # dat <- st_as_sf(dat, coords = c("x", "y"), crs = nad83)
+    #' # names(dat) <- c("ID", "predict_rsf", "equal_area_bins", "value", "geometry")
+    #' 
+    #' #' #'  Rasterize predictions
+    #' #' predicted_raster <- dat_poly %>% 
+    #' #'   dplyr::select(c(bins, geometry)) %>%
+    #' #'   st_rasterize(st_as_stars(st_bbox(ref_raster), nx = nrow(ref_raster), ny = ncol(ref_raster)))
+    #' #' #template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), #template = st_as_stars(ref_raster)
+    #' #'                #align = TRUE)
     
     return(dat)
   }
   den_Kpredict_binned <- lapply(den_Kpredict, reclassify_RSF, covs = zcovs_den_mwepa); head(den_Kpredict_binned[[1]])
   rnd_Kpredict_binned <- lapply(rnd_Kpredict, reclassify_RSF, covs = zcovs_rnd_mwepa)
+  
+  #'  Rasterize predicted RSF values
+  rasterize_rsf <- function(dat) {
+    df <- dat
+    #'  Identify coordinates of rsf predictions
+    coordinates(df) <- ~ x + y
+    #'  Coerce predictions to SpatialPixelsDataFrame
+    gridded(df) <- TRUE
+    #'  Coerce to raster
+    rasterRSF <- raster(df)
+    #'  Define projection
+    crs(rasterRSF) <- nad83
+    plot(rasterRSF)
+    
+    
+    return(rasterRSF)
+  }
+  md_smr_Kfoldraster <- lapply(den_Kpredict_binned, rasterize_rsf)
   
   #'  -----------------------
   ####  Cross-validate RSFs  ####
