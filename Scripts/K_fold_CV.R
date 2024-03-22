@@ -20,7 +20,7 @@
   library(sf)
   library(terra)
   library(stars)
-  library(sp)
+  # library(sp)
   library(ggplot2)
   library(tidyverse)
   
@@ -267,13 +267,13 @@
   #'  Load reference raster and identify coordinate system
   ref_raster <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif"); res(ref_raster); crs(ref_raster)
   grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp") # THIS TAKES AWHILE
-  wmepa_grid_pts <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
+  # wmepa_grid_pts <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
   nad83 <- st_crs(ref_raster)
-  wmepa_grid_pts <- st_as_sf(wmepa_grid_pts, coords = c("X", "Y"), crs = nad83) 
+  # wmepa_grid_pts <- st_as_sf(wmepa_grid_pts, coords = c("X", "Y"), crs = nad83) 
   
   #'  Reclassify RSF predictions into 10 equal area bins (Boyce et al. 2002) and rasterize
   #'  Robust to extreme outlier on either end of distribution
-  reclassify_RSF <- function(dat, covs) {
+  reclassify_RSF <- function(dat, covs, listcount, sitetype) {
     #'  Create 10 breaks for bins of equal area
     bin_rsf <- quantile(dat$predict_rsf, seq(0, 1, by = 0.1))
     print(bin_rsf)
@@ -289,52 +289,72 @@
     
     #'  Grab cellID from covs and add to dat
     cellID <- dplyr::select(covs, c("cellID", "ID"))
-    dat <- full_join(dat, cellID, by = "ID")
+    dat <- full_join(dat, cellID, by = "ID") %>%
+      rename("CellID" = "cellID") %>%
+      mutate(bins = as.numeric(bins))
     
-    #' #'  Convert to sf object
-    #' dat_sf <- full_join(wmepa_grid_pts, dat, by = "cellID") #%>%  
-    #' #   # full_join(grid_poly, dat, by = c("CellID" = "cellID"))
-    #' #   # dplyr::select(c("CellID", "bins")) %>% rename("value" = "bins")
-    #' #   dplyr::select("bins") %>% rename("x" = "bins"); crs(dat_poly)
-    #' # # dat_poly <- full_join(grid_poly, dat, by = c("CellID" = "cellID"))
-    #' # # dplyr::select(c("CellID", "bins")) %>% rename("value" = "bins")
-    #' dat_sp <- as_Spatial(dat_sf)
+    #'  Append data to polygon sf object
+    predict_poly <- full_join(grid_poly, dat, by = "CellID"); crs(predict_poly)
+    #'  Rename for st_rasterize
+    names(predict_poly) <- c("cellID", "newID", "x", "y", "predictions", "equal_area", "value", "geometry")
     
-    #' dat_vect <- vect(dat_sp)
-    #' predicted_raster <- rasterize(dat_vect, ref_raster, field = "x")
-    #' 
-    #' # dat <- st_as_sf(dat, coords = c("x", "y"), crs = nad83)
-    #' # names(dat) <- c("ID", "predict_rsf", "equal_area_bins", "value", "geometry")
-    #' 
-    #' #' #'  Rasterize predictions
-    #' #' predicted_raster <- dat_poly %>% 
-    #' #'   dplyr::select(c(bins, geometry)) %>%
-    #' #'   st_rasterize(st_as_stars(st_bbox(ref_raster), nx = nrow(ref_raster), ny = ncol(ref_raster)))
-    #' #' #template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), #template = st_as_stars(ref_raster)
-    #' #'                #align = TRUE)
+    #'  Rasterize predictions
+    #'  Use MWEPA masked grid as the template for rasterizing so the resolution, extent, and coordinate system are correct
+    prediction_raster <- st_rasterize(predict_poly %>% dplyr::select(value, geometry), template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), align = TRUE)
+    plot(prediction_raster)
     
-    return(dat)
+    #' #'  Save
+    #' write_stars(prediction_raster, paste0("./Shapefiles/predicted_raster_", sitetype, listcount, ".tif"))
+    
+    
+    return(prediction_raster)
   }
-  den_Kpredict_binned <- lapply(den_Kpredict, reclassify_RSF, covs = zcovs_den_mwepa); head(den_Kpredict_binned[[1]])
+  # countlist <- list(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  # den_Kpredict_binned <- mapply(reclassify_RSF, den_Kpredict, listcount = countlist, covs = zcovs_den_mwepa, sitetype = "den")
+  den_Kpredict_binned <- lapply(den_Kpredict, reclassify_RSF, covs = zcovs_den_mwepa)
   rnd_Kpredict_binned <- lapply(rnd_Kpredict, reclassify_RSF, covs = zcovs_rnd_mwepa)
   
-  #'  Rasterize predicted RSF values
-  rasterize_rsf <- function(dat) {
-    df <- dat
-    #'  Identify coordinates of rsf predictions
-    coordinates(df) <- ~ x + y
-    #'  Coerce predictions to SpatialPixelsDataFrame
-    gridded(df) <- TRUE
-    #'  Coerce to raster
-    rasterRSF <- raster(df)
-    #'  Define projection
-    crs(rasterRSF) <- nad83
-    plot(rasterRSF)
-    
-    
-    return(rasterRSF)
+  #'  Calculate area of each bin by summing number of pixels per bin
+  calc_bin_area <- function(rast){
+    #'  Create list of bin intervals
+    intervals <- list(c(0,1), c(1,2), c(2,3), c(3,4), c(4,5), c(5,6), c(6,7), c(7,8), c(8,9), c(9,10))
+    #'  Calculate area of each bin in raster 
+    bin_area <- sapply(intervals, function(x) { 
+      #'  Sum number of pixels per bin and multiply by raster res
+      sum(rast[] > x[1] & rast[] <= x[2], na.rm = T) * res(ras)[1]^2
+    })
+    return(bin_area)
   }
-  md_smr_Kfoldraster <- lapply(den_Kpredict_binned, rasterize_rsf)
+  #'  Calculate area of each binned category for list k-fold prediction rasters
+  den_karea <- lapply(den_Kpredict_binned, lapply, calc_bin_area)
+  rnd_karea <- lapply(rnd_Kpredict_binned, lapply, calc_bin_area)
+  
+  #'  Rename and stack rasters
+  rename_raster <- function(raster_list) {
+    L <- setNames(raster_list, c("test1", "test2", "test3", "test4", "test5", "test6", "test7", "test8", "test9", "test10"))
+    S <- rast(L)
+    return(S)
+  }
+  den_kfold_stack <- rename_raster(den_Kpredict_binned)
+  rnd_kfold_stack <- rename_raster(rnd_Kpredict_binned)
+  
+  #'  Save
+  writeRaster(den_kfold_stack, filename = "./Shapefiles/Predicted RSFs/den_kfold_stack.tif", bylayer = FALSE, format = 'GTiff', overwrite = TRUE)
+  writeRaster(rnd_kfold_stack, filename = "./Shapefiles/Predicted RSFs/rnd_kfold_stack.tif", bylayer = FALSE, format = 'GTiff', overwrite = TRUE)
+  
+  #'  Plot smattering of predictions
+  pdf(file = "./Outputs/Kfold_RSF_predictions.pdf")
+  plot(den_kfold_stack[[1]], main = "Predicted den RSF fold1"); #plot(OK.SA, add = T)
+  plot(den_kfold_stack[[3]], main = "Predicted den RSF fold3") 
+  plot(den_kfold_stack[[5]], main = "Predicted den RSF fold5") 
+  plot(den_kfold_stack[[7]], main = "Predicted den RSF fold7") 
+  plot(den_kfold_stack[[9]], main = "Predicted den RSF fold9") 
+  plot(rnd_kfold_stack[[2]], main = "Predicted den RSF fold2") 
+  plot(rnd_kfold_stack[[4]], main = "Predicted den RSF fold4") 
+  plot(rnd_kfold_stack[[6]], main = "Predicted den RSF fold6") 
+  plot(rnd_kfold_stack[[8]], main = "Predicted den RSF fold8")
+  plot(rnd_kfold_stack[[10]], main = "Predicted den RSF fold10")
+  dev.off()
   
   #'  -----------------------
   ####  Cross-validate RSFs  ####
@@ -352,11 +372,90 @@
       separate_wider_delim(cols = geometry, delim = ',', names = c("x", "y")) %>%
       mutate(x = gsub(".*c", "", x)) %>%
     #'  Convert to sf object
-    st_as_sf(coords = c("x", "y"), crs = wgs84)
+    st_as_sf(coords = c("x", "y"), crs = wgs84) %>%
+      #'  Reporoject to match raster projection
+      st_transform(nad83)
     return(used_locs)
   }
   testing_pts_den_k <- lapply(data_den_k[[2]], testing_pts); head(testing_pts_den_k[[1]])
   testing_rnd_den_k <- lapply(data_rnd_k[[2]], testing_pts)
+  
+  #'  Extract used bins per fold
+  used_bins <- function(rsf_raster, used_locs) {
+    used_bins <- terra::extract(rsf_raster, used_locs)
+    hist(used_bins$layer) #bins
+    return(used_bins)
+  }
+  den_usedbin <- lapply(den_kfold_stack, used_bins, used_locs = testing_pts_den_k)
+  rnd_usedbin <- lapply(rnd_kfold_stack, used_bins, used_locs = testing_pts_rnd_k)
+  
+  #'  Unlist data so it's contained in one big df
+  den_usedbin_df <- bind_rows(den_usedbin_df, .id = "column_label")
+  rnd_usedbin_df <- bind_rows(rnd_usedbin_df, .id = "column_label")
+  
+  #'  Create histogram of used bins
+  den_bin_histogram <- ggplot(den_usedbin_df, aes(x = bins)) +
+    geom_histogram(color = "black", fill = "white")
+  den_bin_histogram
+  
+  rnd_bin_histogram <- ggplot(rnd_usedbin_df, aes(x = bins)) +
+    geom_histogram(color = "black", fill = "white")
+  rnd_bin_histogram
+  
+  #'  Function to area weight frequency of each bin and calculate Spearman's 
+  #'  Rank Correlation
+  area_weighted_freq <- function(used_bin, bin_area) { 
+    wgtBinFreq <- used_bin %>%
+      #'  Count frequency of each used bin
+      group_by(layer) %>%
+      summarise(Freq = sum(layer)) %>%
+      ungroup() %>%
+      #'  Drop NA's for the rare instance when a location overlaps masked pixels
+      filter(!is.na(Freq))
+    #'  Identify any missing bins (e.g., if lowest bin was never used) and IF
+    #'  missing, add to data frame with frequency = 0, ELSE leave as is
+    missing <- setdiff(1:10, wgtBinFreq$layer)
+    if(length(missing) > 0){
+      #'  Complete finishes the sequence in layer column (1:10) and fills Freq 
+      wgtBinFreq <- complete(wgtBinFreq, layer = 1:10, fill = list(Freq = 0)) 
+    } else {
+      wgtBinFreq
+    }
+    #'  Area-weight frequency by number of area of each bin in study area
+    wgtBinFreq <- cbind(wgtBinFreq, bin_area) %>%
+      mutate(wgt_Freq = Freq/bin_area)
+    #'  Calculate Spearman's Rank Correlation between bin rank and area-weighted
+    #'  frequency of used locations
+    SpearmanCor <- cor(wgtBinFreq$layer, wgtBinFreq$wgt_Freq, method = "spearman")
+    return(SpearmanCor)
+  }
+  
+  #'  Function to loop through lists of lists of used bins & bin areas to calculate
+  #'  Spearman's Rank Correlation for each K-fold model
+  Sp_Rank_Cor <- function(used_bin, bin_area) {
+    SpRankCor <- matrix(0,3,5) 
+    for(i in 1:10){
+        usedbin <- used_bin[[i]]
+        binarea <- bin_area[[i]]
+        SpRankCor[i] <- area_weighted_freq(usedbin, binarea)
+        #'  Calculate mean, SD, & SE across k-folds for each year
+        SpRankCor <- as.data.frame(SpRankCor) %>%
+          mutate(mu.SpCor = rowMeans(dplyr::select(.,starts_with("V")), na.rm = TRUE),
+                 sd.SpCor = apply(dplyr::select(.,starts_with("V")), 1, sd),
+                 se.SpCor = sd.SpCor/sqrt(length(dplyr::select(.,starts_with("V")))))
+    }
+    return(SpRankCor)
+  }
+  #'  Run each folded dataset through Sp_Rank_Cor function, which calls the area_weighted_freq 
+  #'  function to calculate Spearman's Rank Correlation for every fold
+  den_SpRankCor <- Sp_Rank_Cor(used_bin = den_usedbin, bin_area = den_karea)
+  rnd_SpRankCor <- Sp_Rank_Cor(used_bin = rnd_usedbin, bin_area = rnd_karea)
+  
+  #'  Try Dave's regression approach too
+  #'  extract bins for used locations in each training data set and regress against 
+  #'  bins of used locations from testing data set, calculate R^2
+  #'  complete for each fold and plot 10 regressions against each other
+  #'  ideally all R^2 are high, slope is not different than 1 and intercept not different from 0 (i.e., perfect correlation)
   
   
   
