@@ -349,14 +349,14 @@
   #'  100% MCP and buffered MCP
   ggplot(homesite_mcp_buff) + geom_sf() + geom_sf(data = homesite_mcp_sf)
   #'  Den/rendezvous sites within maksed & buffered MCP and Zone 1 for context within Exp. Pop. Area
-  ggplot(st_transform(wmepa, nad27_12N)) + geom_sf() + geom_sf(data = wmepa_suitable_nad27, fill = "gray65") + 
+  ggplot(st_transform(wmepa, nad27_12N)) + geom_sf(data = wmepa_suitable_nad27, fill = "gray65") + 
     geom_sf(data = homesite_mcp_buff_suitablemask, color = "red", fill = NA) + 
     # geom_sf(data = homesite_mcp_sf, color = "blue", fill = NA) + 
     geom_sf(data = st_transform(wmz1, nad27_12N), color = "gray15", fill = NA, size = 0.7) + #fill = "gray15", alpha = 0.50) +
     geom_sf(data = homesites_nad27_usa[homesites_nad27_usa$Site_Type == "Den",], aes(color = Year), shape = 16, size = 1.5) +
     coord_sf(xlim = c(buff_bbox[1], buff_bbox[3]), ylim = c(buff_bbox[2], buff_bbox[4]), expand = TRUE) +
     ggtitle("Den sites, MWZ1, and buffered MCP (excluding unsuitable habitat)")
-  ggplot(st_transform(wmepa, nad27_12N)) + geom_sf() + geom_sf(data = wmepa_suitable_nad27, fill = "gray65") + 
+  ggplot(st_transform(wmepa, nad27_12N)) + geom_sf(data = wmepa_suitable_nad27, fill = "gray65") + 
     geom_sf(data = homesite_mcp_buff_suitablemask, color = "red", fill = NA) + 
     # geom_sf(data = homesite_mcp_sf, color = "blue", fill = NA) + 
     geom_sf(data = st_transform(wmz1, nad27_12N), color = "gray15", fill = NA, size = 0.7) + #, fill = "gray15", alpha = 0.50) +
