@@ -298,63 +298,96 @@
     #'  Rename for st_rasterize
     names(predict_poly) <- c("cellID", "newID", "x", "y", "predictions", "equal_area", "value", "geometry")
     
-    #'  Rasterize predictions
-    #'  Use MWEPA masked grid as the template for rasterizing so the resolution, extent, and coordinate system are correct
-    prediction_raster <- st_rasterize(predict_poly %>% dplyr::select(value, geometry), template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), align = TRUE)
-    plot(prediction_raster)
+    #' #'  Rasterize predictions
+    #' #'  Use MWEPA masked grid as the template for rasterizing so the resolution, extent, and coordinate system are correct
+    #' prediction_raster <- st_rasterize(predict_poly %>% dplyr::select(value, geometry), template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), align = TRUE)
+    #' plot(prediction_raster)
+    #' 
+    #' #'  Convert to a terra raster object
+    #' prediction_raster_terra <- rast(prediction_raster)
     
-    #' #'  Save
-    #' write_stars(prediction_raster, paste0("./Shapefiles/predicted_raster_", sitetype, listcount, ".tif"))
-    
-    
-    return(prediction_raster)
+    return(predict_poly)
   }
-  # countlist <- list(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-  # den_Kpredict_binned <- mapply(reclassify_RSF, den_Kpredict, listcount = countlist, covs = zcovs_den_mwepa, sitetype = "den")
   den_Kpredict_binned <- lapply(den_Kpredict, reclassify_RSF, covs = zcovs_den_mwepa)
   rnd_Kpredict_binned <- lapply(rnd_Kpredict, reclassify_RSF, covs = zcovs_rnd_mwepa)
   
+  #'  Save binned classifications per fold
+  save(den_Kpredict_binned, file = "./Outputs/den_Kpredict_binned.RData")
+  save(rnd_Kpredict_binned, file = "./Outputs/rnd_Kpredict_binned.RData")
+  
+  #'  Function to rasterize binned data
+  rasterize_rsf <- function(predicted_rast) {
+    #'  Use MWEPA masked grid as the template for rasterizing so the resolution, 
+    #'  extent, and coordinate system are correct
+    prediction_raster <- st_rasterize(predicted_rast %>% dplyr::select(value, geometry), 
+                                      template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), 
+                                      align = TRUE)
+    plot(prediction_raster)
+    
+    #'  Convert to a terra raster object
+    prediction_raster_terra <- rast(prediction_raster)
+    
+    return(prediction_raster_terra)
+  }
+  den_kpredict_rast <- lapply(den_Kpredict_binned, rasterize_rsf)
+  rnd_kpredict_rast <- lapply(rnd_Kpredict_binned, rasterize_rsf)
+  
+  #'  Save rasterized binned RSFs
+  save(den_Kpredict_binned, file = "./Shapefiles/Predicted RSFs/den_Kpredict_binned.RData")
+  save(rnd_Kpredict_binned, file = "./Shapefiles/Predicted RSFs/rnd_Kpredict_binned.RData")
+  
+  #' #'  Convert raster from stars object to terra object
+  #' reformat_raster <- function(rast) {
+  #'   terra_raster <- rast(rast)
+  #'   return(terra_raster)
+  #' }
+  #' den_kfold_stack <- lapply(den_Kpredict_binned, reformat_raster)
+  #' rnd_kfold_stack <- lapply(rnd_Kpredict_binned, reformat_raster)
+  
+  #'  Stack raster
+  raster_stack <- function(rast_list) {
+    rast_stack <- rast(rast_list)
+    return(rast_stack)
+  }
+  den_kfold_stack <- raster_stack(den_Kpredict_binned)
+  rnd_kfold_stack <- raster_stack(rnd_Kpredict_binned)
+  
+  #'  Save raster stack
+  writeRaster(den_kfold_stack, filename = "./Shapefiles/Predicted RSFs/den_kfold_stack.tif", overwrite = TRUE)
+  writeRaster(rnd_kfold_stack, filename = "./Shapefiles/Predicted RSFs/rnd_kfold_stack.tif", overwrite = TRUE)
+  
+  #'  Load MW Zone1 for reference
+  wmz1 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_1.shp") %>% st_transform(nad83)
+  
+  #'  Plot smattering of predictions
+  pdf(file = "./Outputs/Kfold_RSF_predictions.pdf") 
+  plot(den_kfold_stack[[1]], main = "Predicted den RSF fold1"); plot(wmz1, fill = NULL, color = "black", add = T)
+  plot(den_kfold_stack[[3]], main = "Predicted den RSF fold3"); plot(wmz1, fill = NULL, color = "black", add = T)
+  plot(den_kfold_stack[[5]], main = "Predicted den RSF fold5"); plot(wmz1, fill = NULL, color = "black", add = T) 
+  plot(den_kfold_stack[[7]], main = "Predicted den RSF fold7"); plot(wmz1, fill = NULL, color = "black", add = T) 
+  plot(den_kfold_stack[[9]], main = "Predicted den RSF fold9"); plot(wmz1, fill = NULL, color = "black", add = T) 
+  # plot(rnd_kfold_stack[[2]], main = "Predicted den RSF fold2"); plot(wmz1, fill = NULL, color = "black", add = T) 
+  # plot(rnd_kfold_stack[[4]], main = "Predicted den RSF fold4"); plot(wmz1, fill = NULL, color = "black", add = T) 
+  # plot(rnd_kfold_stack[[6]], main = "Predicted den RSF fold6"); plot(wmz1, fill = NULL, color = "black", add = T) 
+  # plot(rnd_kfold_stack[[8]], main = "Predicted den RSF fold8"); plot(wmz1, fill = NULL, color = "black", add = T)
+  # plot(rnd_kfold_stack[[10]], main = "Predicted den RSF fold10"); plot(wmz1, fill = NULL, color = "black", add = T)
+  dev.off()
+  
   #'  Calculate area of each bin by summing number of pixels per bin
-  calc_bin_area <- function(rast){
+  calc_bin_area <- function(ras){
     #'  Create list of bin intervals
     intervals <- list(c(0,1), c(1,2), c(2,3), c(3,4), c(4,5), c(5,6), c(6,7), c(7,8), c(8,9), c(9,10))
     #'  Calculate area of each bin in raster 
     bin_area <- sapply(intervals, function(x) { 
-      #'  Sum number of pixels per bin and multiply by raster res
-      sum(rast[] > x[1] & rast[] <= x[2], na.rm = T) * res(ras)[1]^2
+      #'  Sum number of pixels per bin and multiply by raster resolution
+      sum(ras[] > x[1] & ras[] <= x[2], na.rm = T) * res(ras)[1]^2
     })
     return(bin_area)
   }
   #'  Calculate area of each binned category for list k-fold prediction rasters
-  den_karea <- lapply(den_Kpredict_binned, lapply, calc_bin_area)
-  rnd_karea <- lapply(rnd_Kpredict_binned, lapply, calc_bin_area)
+  den_karea <- lapply(den_kfold_stack, lapply, calc_bin_area)
+  rnd_karea <- lapply(rnd_kfold_stack, lapply, calc_bin_area)
   
-  #'  Rename and stack rasters
-  rename_raster <- function(raster_list) {
-    L <- setNames(raster_list, c("test1", "test2", "test3", "test4", "test5", "test6", "test7", "test8", "test9", "test10"))
-    S <- rast(L)
-    return(S)
-  }
-  den_kfold_stack <- rename_raster(den_Kpredict_binned)
-  rnd_kfold_stack <- rename_raster(rnd_Kpredict_binned)
-  
-  #'  Save
-  writeRaster(den_kfold_stack, filename = "./Shapefiles/Predicted RSFs/den_kfold_stack.tif", bylayer = FALSE, format = 'GTiff', overwrite = TRUE)
-  writeRaster(rnd_kfold_stack, filename = "./Shapefiles/Predicted RSFs/rnd_kfold_stack.tif", bylayer = FALSE, format = 'GTiff', overwrite = TRUE)
-  
-  #'  Plot smattering of predictions
-  pdf(file = "./Outputs/Kfold_RSF_predictions.pdf")
-  plot(den_kfold_stack[[1]], main = "Predicted den RSF fold1"); #plot(OK.SA, add = T)
-  plot(den_kfold_stack[[3]], main = "Predicted den RSF fold3") 
-  plot(den_kfold_stack[[5]], main = "Predicted den RSF fold5") 
-  plot(den_kfold_stack[[7]], main = "Predicted den RSF fold7") 
-  plot(den_kfold_stack[[9]], main = "Predicted den RSF fold9") 
-  plot(rnd_kfold_stack[[2]], main = "Predicted den RSF fold2") 
-  plot(rnd_kfold_stack[[4]], main = "Predicted den RSF fold4") 
-  plot(rnd_kfold_stack[[6]], main = "Predicted den RSF fold6") 
-  plot(rnd_kfold_stack[[8]], main = "Predicted den RSF fold8")
-  plot(rnd_kfold_stack[[10]], main = "Predicted den RSF fold10")
-  dev.off()
   
   #'  -----------------------
   ####  Cross-validate RSFs  ####
@@ -367,31 +400,34 @@
     used_locs <- test_dat %>%
       filter(used == 1) %>%
       dplyr::select(c(Pack_year, used, .folds, geometry)) %>%
-      mutate(geometry = gsub("[()]", "", geometry)) %>%
+      mutate(geometry = gsub("[()]", "", geometry),
+             geometry = gsub(".*c", "", geometry)) %>%
       #'  Split geometry into two columns
-      separate_wider_delim(cols = geometry, delim = ',', names = c("x", "y")) %>%
-      mutate(x = gsub(".*c", "", x)) %>%
-    #'  Convert to sf object
-    st_as_sf(coords = c("x", "y"), crs = wgs84) %>%
+      separate(geometry, into = c("x", "y"), sep = "\\,") %>%
+      #'  Convert to sf object
+      st_as_sf(coords = c("x", "y"), crs = wgs84) %>%
       #'  Reporoject to match raster projection
       st_transform(nad83)
     return(used_locs)
   }
   testing_pts_den_k <- lapply(data_den_k[[2]], testing_pts); head(testing_pts_den_k[[1]])
-  testing_rnd_den_k <- lapply(data_rnd_k[[2]], testing_pts)
+  testing_pts_rnd_k <- lapply(data_rnd_k[[2]], testing_pts); head(testing_pts_rnd_k[[1]])
   
-  #'  Extract used bins per fold
-  used_bins <- function(rsf_raster, used_locs) {
-    used_bins <- terra::extract(rsf_raster, used_locs)
-    hist(used_bins$layer) #bins
+  #'  Extract used bins per fold and visualize output
+  used_bins <- function(used_locs, rsf_raster) {
+    used_bins <- terra::extract(rsf_raster, used_locs) %>%
+      pivot_longer(!ID, names_to = "fold", values_to = "selection_bin")
+    hist(na.omit(used_bins$selection_bin), main = "Frequency of used bins", xlab = "Selection bin") 
     return(used_bins)
   }
-  den_usedbin <- lapply(den_kfold_stack, used_bins, used_locs = testing_pts_den_k)
+  den_usedbin <- mapply(used_bins, used_locs = testing_pts_den_k, rsf_raster = den_Kpredict_binned)
+  rnd_usedbin <- mapply(used_bins, used_locs = testing_pts_rnd_k, rsf_raster = rnd_Kpredict_binned)
+  den_usedbin <- lapply(testing_pts_den_k, used_bins, rsf_raster = den_kfold_stack) 
   rnd_usedbin <- lapply(rnd_kfold_stack, used_bins, used_locs = testing_pts_rnd_k)
   
   #'  Unlist data so it's contained in one big df
-  den_usedbin_df <- bind_rows(den_usedbin_df, .id = "column_label")
-  rnd_usedbin_df <- bind_rows(rnd_usedbin_df, .id = "column_label")
+  den_usedbin_df <- bind_rows(den_usedbin, .id = "column_label")
+  rnd_usedbin_df <- bind_rows(rnd_usedbin, .id = "column_label")
   
   #'  Create histogram of used bins
   den_bin_histogram <- ggplot(den_usedbin_df, aes(x = bins)) +
