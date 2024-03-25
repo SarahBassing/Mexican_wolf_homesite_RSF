@@ -393,6 +393,103 @@
   
   ######  Map predicted habitat selection  ######
   #'  -------------------------------------
+  library(sf)
+  library(terra)
+  library(stars)
+  library(tidyterra)
+  
+  #'  Load reference raster and reference polygons
+  ref_raster <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif"); res(ref_raster); crs(ref_raster)
+  grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp") # THIS TAKES AWHILE
+  nad83 <- st_crs(ref_raster)
+   
+  #'  Reclassify RSF predictions into 10 equal area bins (Boyce et al. 2002) and rasterize
+  #'  Robust to extreme outlier on either end of distribution
+  reclassify_RSF <- function(dat, covs, listcount, sitetype) {
+    #'  Create 10 breaks for bins of equal area
+    bin_rsf <- quantile(dat$predict_rsf, seq(0, 1, by = 0.1))
+    print(bin_rsf)
+    
+    #'  Cut predicted RSF values into bins based on break points
+    dat$equal_area_bins <- cut(dat$predict_rsf, breaks = bin_rsf, include.lowest = TRUE)
+    #'  Same thing but relable them to something more useful
+    dat$bins <- cut(dat$predict_rsf, breaks = bin_rsf, include.lowest = TRUE,
+                    labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"))
+    
+    #'  Double check bins are of equal size
+    print(table(dat$bins))
+    
+    #'  Grab cellID from covs and add to dat
+    cellID <- dplyr::select(covs, c("cellID", "ID"))
+    dat <- full_join(dat, cellID, by = "ID") %>%
+      rename("CellID" = "cellID") %>%
+      mutate(bins = as.numeric(bins))
+    
+    #'  Append data to polygon sf object
+    predict_poly <- full_join(grid_poly, dat, by = "CellID"); crs(predict_poly)
+    #'  Rename for st_rasterize
+    names(predict_poly) <- c("cellID", "newID", "x", "y", "predictions", "equal_area", "value", "geometry")
+    
+    return(predict_poly)
+  }
+  den_predict_binned <- reclassify_RSF(den_h4.predict, covs = zcovs_den_mwepa)
+  rnd_predict_binned <- reclassify_RSF(rnd_h2.predict, covs = zcovs_rnd_mwepa)
+  
+  #'  Save binned classifications per fold
+  save(den_predict_binned, file = "./Outputs/den_predict_binned.RData")
+  save(rnd_predict_binned, file = "./Outputs/rnd_predict_binned.RData")
+  
+  #'  Function to rasterize binned data
+  rasterize_rsf <- function(predicted_rast) {
+    #'  Use MWEPA masked grid as the template for rasterizing so the resolution, 
+    #'  extent, and coordinate system are correct
+    prediction_raster <- st_rasterize(predicted_rast %>% dplyr::select(value, geometry), 
+                                      template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), 
+                                      align = TRUE)
+    plot(prediction_raster)
+    
+    #'  Convert to a terra raster object
+    prediction_raster_terra <- rast(prediction_raster)
+    names(prediction_raster_terra) <- "RSF_bin"
+    
+    return(prediction_raster_terra)
+  }
+  den_predict_rast <- rasterize_rsf(den_predict_binned)
+  rnd_predict_rast <- rasterize_rsf(rnd_predict_binned)
+  
+  #'  Save rasterized binned RSFs
+  save(den_predict_rast, file = "./Shapefiles/Predicted RSFs/den_predict_rasters.RData")
+  save(rnd_predict_rast, file = "./Shapefiles/Predicted RSFs/rnd_predict_rasters.RData")
+  
+  #'  Map predicted RSFs
+  #'  Define color palette (only bins 7-10 really identifiable)
+  mycolors <- c("ivory1", "beige", "lightyellow", "lemonchiffon1", "lemonchiffon2", "khaki1", "gold", "darkgoldenrod1", "darkorange", "firebrick1")
+  den_rsf_plot <- ggplot() +
+    geom_spatraster(data = den_predict_rast, aes(fill = RSF_bin)) +
+    coord_sf(crs = nad83) +
+    scale_fill_gradientn(colours = mycolors, na.value = NA, 
+                         breaks = seq(0, 10, 2)) +
+    labs(fill = "RSF bin") + xlab("Longitude") + ylab("Latitude") +
+    ggtitle("Predicted selection bin for Mexican wolf den sites") + 
+    theme_bw() + 
+    theme(text = element_text(size = 18))
+  den_rsf_plot
+  
+  rnd_rsf_plot <- ggplot() +
+    geom_spatraster(data = rnd_predict_rast, aes(fill = RSF_bin)) +
+    coord_sf(crs = nad83) +
+    scale_fill_gradientn(colours = mycolors, na.value = NA, 
+                         breaks = seq(0, 10, 2)) +
+    labs(fill = "RSF bin") + xlab("Longitude") + ylab("Latitude") +
+    ggtitle("Predicted selection bin for Mexican wolf rendezvous sites") + 
+    theme_bw() + 
+    theme(text = element_text(size = 18))
+  rnd_rsf_plot
+  
+  ggsave("./Outputs/Figures/RSF_binned_den_plot.tiff", den_rsf_plot, units = "in", 
+         height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
+  ggsave("./Outputs/Figures/RSF_binned_rnd_plot.tiff", rnd_rsf_plot, units = "in", 
+         height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
   
   
   #####  Functional response to available NDVI  ####
