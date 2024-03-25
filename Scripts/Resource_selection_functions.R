@@ -491,6 +491,16 @@
   ggsave("./Outputs/Figures/RSF_binned_rnd_plot.tiff", rnd_rsf_plot, units = "in", 
          height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
   
+  #'  Zoom in bbox
+  ggplot() +
+    geom_spatraster(data = rnd_predict_rast, aes(fill = RSF_bin)) +
+    scale_fill_gradientn(colours = mycolors, na.value = NA, 
+                         breaks = seq(0, 10, 2)) +
+    coord_sf(crs = nad83) +
+    scale_y_continuous(limits = c(33.40897, 33.52001), expand = c(0, 0)) + 
+    scale_x_continuous(limits = c(-108.90710, -108.55975), expand = c(0, 0))
+  
+    
   
   #####  Functional response to available NDVI  ####
   #'  ------------------------------------------
