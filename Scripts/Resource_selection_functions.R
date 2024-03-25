@@ -120,6 +120,10 @@
   (den_ModSelect <- model.sel(h0.den, h1.den, h2.den, h3.den, h4.den))
   #'  h4.den deltaAICc = 11.32 better than the next best model (h2.den)
   
+  h4.den_reduced <- glm(used ~ Elev + Slope + Rough + Dist2Water + Dist2Road, 
+  data = den_dataz, weight = wgts, family = binomial) 
+  summary(h4.den_reduced)
+  
   #'  ---------------------------
   ####  Rendezvous habitat RSFs  ####    
   #'  ---------------------------
@@ -171,6 +175,9 @@
   #'  No difference in which covariates are significant between h2.rnd & h4.rnd
   #'  so going to conduct k-fold cv on h2.rnd since more parsimonious model
   
+  h2.rnd_reduced <- glm(used ~ Elev + SeasonalNDVI + SeasonalNDVI:AvgSeasonalNDVI + Dist2Water, data = rnd_dataz, weight = wgts, family = binomial) 
+  summary(h2.rnd_reduced)
+  
   #'  ------------------
   ####  Results tables  ####
   #'  ------------------
@@ -211,14 +218,14 @@
     return(out)
   }
   #'  Extract coefficient estimates for each trained model
-  topmod_den_coefs <- top_rsf_out(h4.den, sitetype = "Den")
-  topmod_rnd_coefs <- top_rsf_out(h2.rnd, sitetype = "Rendezvous")
+  topmod_den_coefs <- top_rsf_out(h4.den_reduced, sitetype = "Den")          # h4.den
+  topmod_rnd_coefs <- top_rsf_out(h2.rnd_reduced, sitetype = "Rendezvous")   # h2.rnd
   
   #'  Coefficient results table
   topmod_coefs <- bind_rows(topmod_den_coefs, topmod_rnd_coefs)
   
   #'  Write file for publication
-  write_csv(topmod_coefs, file = "./Outputs/Tables/Top_Model_Coefficients.csv")
+  write_csv(topmod_coefs, file = "./Outputs/Tables/Top_Model_Coefficients_reduced.csv")
   
   #####  AIC model ranks  #####
   #'  Generate modelselection objects
@@ -340,8 +347,8 @@
     return(out)
   }
   #'  Extract coefficient estimates for each trained model
-  coefs_h4.den <- rsf_out(h4.den)
-  coefs_h2.rnd <- rsf_out(h2.rnd)
+  coefs_h4.den <- rsf_out(h4.den_reduced)   #h4.den
+  coefs_h2.rnd <- rsf_out(h2.rnd_reduced)   #h2.rnd
   
   ####  Predict across suitable habitat ####
   #'  ----------------------------------
