@@ -448,11 +448,11 @@
     plot_layout(guides = "collect")
   
   #'  Save plots
-  ggplot("./Outputs/Figures/Kfold_den_selected_bins.png", den_bin_histogram, 
+  ggsave("./Outputs/Figures/Kfold_den_selected_bins.tif", den_bin_histogram, 
          units = "in", height = 8, width = 8, dpi = 600, device = 'tiff', compression = 'lzw')
-  ggplot("./Outputs/Figures/Kfold_rnd_selected_bins.png", rnd_bin_histogram, 
+  ggsave("./Outputs/Figures/Kfold_rnd_selected_bins.tif", rnd_bin_histogram, 
          units = "in", height = 8, width = 8, dpi = 600, device = 'tiff', compression = 'lzw')
-  ggplot("./Outputs/Figures/Kfold_selected_bins_histogram.png", bin_histograms, 
+  ggsave("./Outputs/Figures/Kfold_selected_bins_histogram.tif", bin_histograms, 
          units = "in", height = 8, width = 16, dpi = 600, device = 'tiff', compression = 'lzw')
   
   
