@@ -22,6 +22,7 @@
   library(stars)
   library(ggplot2)
   library(RColorBrewer)
+  library(patchwork)
   library(tidyverse)
   
   #'  Load used/available location data and covariates
@@ -164,7 +165,6 @@
   zcovs_rnd_mwepa <- standardize_mwepa_covs(grid_covs, mu.sd = data_rnd_stats)
   
   #'  Function to save parameter estimates from each trained model
-  #'  Use coef(mod) to look at random effects estimates
   rsf_out <- function(mod){
     beta <- mod$coefficients
     out <- as.data.frame(beta) %>%
@@ -428,7 +428,8 @@
     scale_fill_manual(values = myPal) + 
     ylab("Frequency of used locations") + 
     labs(fill = "Fold \nnumber") +
-    ggtitle("Selected RSF bins at den locations withheld as testing data")
+    ggtitle("Den site selection bins")
+    # ggtitle("Selected RSF bins at den locations withheld as testing data")
   den_bin_histogram
   
   rnd_bin_histogram <- ggplot(rnd_usedbin_df, aes(selection_bin, fill = fold_ID)) +
@@ -437,8 +438,23 @@
     scale_fill_manual(values = myPal) + 
     ylab("Frequency of used locations") + 
     labs(fill = "Fold \nnumber") +
-    ggtitle("Selected RSF bins at rendezvous locations withheld as testing data")
+    ggtitle("Rendezvous site selection bins")
+    # ggtitle("Selected RSF bins at rendezvous locations withheld as testing data")
   rnd_bin_histogram
+  
+  bin_histograms <- den_bin_histogram + rnd_bin_histogram +
+    plot_annotation(title = "Selected RSF bins at used sites withheld as testing data") +
+    plot_annotation(tag_levels = 'a') + 
+    plot_layout(guides = "collect")
+  
+  #'  Save plots
+  ggplot("./Outputs/Figures/Kfold_den_selected_bins.png", den_bin_histogram, 
+         units = "in", height = 8, width = 8, dpi = 600, device = 'tiff', compression = 'lzw')
+  ggplot("./Outputs/Figures/Kfold_rnd_selected_bins.png", rnd_bin_histogram, 
+         units = "in", height = 8, width = 8, dpi = 600, device = 'tiff', compression = 'lzw')
+  ggplot("./Outputs/Figures/Kfold_selected_bins_histogram.png", bin_histograms, 
+         units = "in", height = 8, width = 16, dpi = 600, device = 'tiff', compression = 'lzw')
+  
   
   #'  Function to area weight frequency of each bin and calculate Spearman's 
   #'  Rank Correlation
