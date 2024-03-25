@@ -36,19 +36,19 @@
                 Homesite = Homesite,
                 used = as.numeric(used),
                 wgts = as.numeric(wgts),
-                Elev = scale(as.numeric(Elevation_m)),
-                Slope = scale(as.numeric(Slope_degrees)),
-                Rough = scale(as.numeric(Roughness_VRM)),
-                Curve = scale(as.numeric(Gaussian_curvature)),
-                Dist2Water = scale(as.numeric(Nearest_water_m)),
-                logDist2Water = scale(log(as.numeric(Nearest_water_m))),
-                HumanMod = scale(as.numeric(Human_mod_index)),
-                Dist2Road = scale(as.numeric(Nearest_road_m)),
-                logDist2Road = scale(log(as.numeric(Nearest_road_m))),
-                CanopyCov = scale(as.numeric(Mean_percent_canopy)),
-                AvgCanopyCov = scale(as.numeric(avg_MCP_canopycover)),
-                SeasonalNDVI = scale(as.numeric(meanNDVI)),
-                AvgSeasonalNDVI = scale(as.numeric(avg_MCP_meanNDVI)))
+                Elev = as.numeric(scale(Elevation_m)),
+                Slope = as.numeric(scale(Slope_degrees)),
+                Rough = as.numeric(scale(Roughness_VRM)),
+                Curve = as.numeric(scale(Gaussian_curvature)),
+                Dist2Water = as.numeric(scale(Nearest_water_m)),
+                logDist2Water = as.numeric(scale(log(Nearest_water_m))),
+                HumanMod = as.numeric(scale(Human_mod_index)),
+                Dist2Road = as.numeric(scale(Nearest_road_m)),
+                logDist2Road = as.numeric(scale(log(Nearest_road_m))),
+                CanopyCov = as.numeric(scale(Mean_percent_canopy)),
+                AvgCanopyCov = as.numeric(scale(avg_MCP_canopycover)),
+                SeasonalNDVI = as.numeric(scale(meanNDVI)),
+                AvgSeasonalNDVI = as.numeric(scale(avg_MCP_meanNDVI)))  ############ DROP ATTRIBUTES FROM SCALING
     
     #'  Assess correlation among all scaled variables
     covs <- dat_z %>%
@@ -174,14 +174,349 @@
   #'  ------------------
   ####  Results tables  ####
   #'  ------------------
+  #####  Coefficient estimates  #####
+  #'  Great result table of top model outputs
+  top_rsf_out <- function(mod, sitetype){
+    #'  Grab coefficient estimate info
+    beta <- summary(mod)$coefficients[,1]
+    se <- summary(mod)$coefficients[,2]
+    pval <- summary(mod)$coefficients[,4]
+    #'  Combine into single data frame and organize
+    out <- as.data.frame(beta) %>%
+      bind_cols(se, pval) %>% 
+      #'  Grab parameter names and rename
+      mutate(Parameter = row.names(.),
+             Parameter = ifelse(Parameter == "(Intercept)", "Intercept", Parameter),
+             Parameter = ifelse(Parameter == "Elev", "Elevation", Parameter),
+             Parameter = ifelse(Parameter == "Slope", "Slope", Parameter),
+             Parameter = ifelse(Parameter == "Rough", "Roughness", Parameter),
+             Parameter = ifelse(Parameter == "Curve", "Curvature", Parameter),
+             Parameter = ifelse(Parameter == "Dist2Water", "Distance to water", Parameter),
+             Parameter = ifelse(Parameter == "HumanMod", "Human modification", Parameter),
+             Parameter = ifelse(Parameter == "Dist2Road", "Distance to road", Parameter),
+             Parameter = ifelse(Parameter == "CanopyCov", "Mean canopy cover", Parameter),
+             Parameter = ifelse(Parameter == "CanopyCov:AvgCanopyCov", "Modified mean canopy cover", Parameter),
+             Parameter = ifelse(Parameter == "SeasonalNDVI", "Mean NDVI", Parameter),
+             Parameter = ifelse(Parameter == "SeasonalNDVI:AvgSeasonalNDVI", "Modified mean NDVI", Parameter),
+             Site = sitetype) %>%
+      #'  Reorganize and rename table
+      relocate(Parameter, .before = beta) %>%
+      relocate(Site, .before = Parameter) 
+    row.names(out) <- NULL
+    names(out) <- c("Site type", "Parameter", "Estimate", "SE", "p-value")
+    #'  Round estiamtes to more manageable values
+    out <- mutate(out, Estimate = round(Estimate, 2),
+                  SE = round(SE, 2),
+                  `p-value` = round(`p-value`, 3))
+    return(out)
+  }
+  #'  Extract coefficient estimates for each trained model
+  topmod_den_coefs <- top_rsf_out(h4.den, sitetype = "Den")
+  topmod_rnd_coefs <- top_rsf_out(h2.rnd, sitetype = "Rendezvous")
   
-  #'  ----------------
-  ####  Plot results  ####
-  #'  ----------------
+  #'  Coefficient results table
+  topmod_coefs <- bind_rows(topmod_den_coefs, topmod_rnd_coefs)
   
-  #'  -------------------------------------------
-  ####  Predict across suitable habitat and map  ####
-  #'  -------------------------------------------
+  #'  Write file for publication
+  write_csv(topmod_coefs, file = "./Outputs/Tables/Top_Model_Coefficients.csv")
+  
+  #####  AIC model ranks  #####
+  #'  Generate modelselection objects
+  den_ModSelect <- model.sel(h0.den, h1.den, h2.den, h3.den, h4.den)
+  rnd_ModSelect <- model.sel(h0.rnd, h1.rnd, h2.rnd, h3.rnd, h4.rnd)
+  
+  AIC_tbl <- function(aictable, sitetype) {
+    #'  Grab relevant information from modelselection object
+    modname <- row.names(aictable)
+    aicc <- aictable$AICc
+    deltaaic <- aictable$delta
+    modwgt <- aictable$weight
+    #'  Merge and organize into a single table
+    modaicselect <- bind_cols(modname, aicc, deltaaic, modwgt)
+    names(modaicselect) <- c("Model", "AICc", "deltaAICc", "Model weight")
+    modaicselect <- modaicselect %>%
+      #'  Add site type to dataframe
+      mutate(Site = sitetype,
+             #'  Rename models to something more meaningful
+             Model = ifelse(Model == "h0.den", "Null", Model),
+             Model = ifelse(Model == "h0.rnd", "Null", Model),
+             Model = ifelse(Model == "h1.den", "Physical protection", Model),
+             Model = ifelse(Model == "h1.rnd", "Wet meadows", Model),
+             Model = ifelse(Model == "h2.den", "Physical protection and water", Model),
+             Model = ifelse(Model == "h2.rnd", "Water availability", Model),
+             Model = ifelse(Model == "h3.den", "Human disturbance", Model),
+             Model = ifelse(Model == "h3.rnd", "Human disturbance", Model),
+             Model = ifelse(Model == "h4.den", "Global", Model),
+             Model = ifelse(Model == "h4.rnd", "Global", Model),
+             #'  Round outputs to more manageable values
+             AICc = round(AICc, 2),
+             deltaAICc = round(deltaAICc, 2),
+             `Model weight` = round(`Model weight`, 2)) %>%
+      #'  Reorganize
+      relocate(Site, .before = Model) %>%
+      rename("Site type" = "Site")
+    return(modaicselect)
+  }
+  AIC_table_den <- AIC_tbl(den_ModSelect, sitetype = "Den")
+  AIC_table_rnd <- AIC_tbl(rnd_ModSelect, sitetype = "Rendezvous")
+  
+  #'  Combine into single AIC model ranking table
+  AIC_table <- bind_rows(AIC_table_den, AIC_table_rnd)
+  
+  #'  Write table for publication
+  write_csv(AIC_table, file = "./Outputs/Tables/AICc_Model_Rank_Table.csv")
+  
+  #'  ---------------------
+  ####  Visualize results  ####
+  #'  ---------------------
+  #'  Load MWEPA masked grid and covariate data
+  grid_covs <- read_csv("./Data/MWEPA_suitable_grid_covs.csv")
+  
+  #'  Grab mean and SD of each covariate from original data set
+  cov_summary_stats <- function(dat) {
+    #'  Drop site identifying info
+    dat <- dplyr::select(dat, -c("ID", "Pack_year", "Homesite", "used", "wgts", "geometry"))
+    #'  Calculate mean and SD of each covariate
+    cov_means <- dat %>%
+      summarise(across(where(is.numeric), \(x) mean(x, na.rm = TRUE)))
+    cov_sd <- dat %>%
+      summarise(across(where(is.numeric), \(x) sd(x, na.rm = TRUE)))
+    #'  Bind and return
+    cov_stats <- bind_rows(cov_means, cov_sd) 
+    cov_stats <- as.data.frame(cov_stats)
+    row.names(cov_stats) <- c("Mean", "SD")
+    return(cov_stats)
+  }
+  data_den_stats <- cov_summary_stats(all_data_den)
+  data_rnd_stats <- cov_summary_stats(all_data_rnd)
+  
+  #'  Standardize grid covs based on mean and SD of covariates in original model
+  standardize_mwepa_covs <- function(dat, mu.sd) {
+    zcovs <- dat %>%
+      transmute(cellID = cellID,
+                ID = ID,
+                Elev = (Elevation_m - mu.sd$Elevation_m[1])/mu.sd$Elevation_m[2],
+                Slope = (Slope_degrees - mu.sd$Slope_degrees[1])/mu.sd$Slope_degrees[2],
+                Rough = (Roughness_VRM - mu.sd$Roughness_VRM[1])/mu.sd$Roughness_VRM[2],
+                Curve = (Gaussian_curvature - mu.sd$Gaussian_curvature[1])/mu.sd$Gaussian_curvature[2],
+                Dist2Water = (Nearest_water_m - mu.sd$Nearest_water_m[1])/mu.sd$Nearest_water_m[2],
+                HumanMod = (Human_mod_index - mu.sd$Human_mod_index[1])/mu.sd$Human_mod_index[2],
+                Dist2Road = (Nearest_road_m - mu.sd$Nearest_road_m[1])/mu.sd$Nearest_road_m[2],
+                CanopyCov = (Mean_percent_canopy - mu.sd$Mean_percent_canopy[1])/mu.sd$Mean_percent_canopy[2],
+                AvgCanopyCov = (avg_MWEPA_canopycover - mu.sd$avg_MCP_canopycover[1])/mu.sd$avg_MCP_canopycover[2],
+                ModifiedCanopyCov = CanopyCov*AvgCanopyCov,
+                SeasonalNDVI = (meanNDVI - mu.sd$meanNDVI[1])/mu.sd$meanNDVI[2],
+                AvgSeasonalNDVI = (avg_MCP_meanNDVI - mu.sd$avg_MCP_meanNDVI[1])/mu.sd$avg_MCP_meanNDVI[2],
+                ModifiedNDVI = SeasonalNDVI * AvgSeasonalNDVI,
+                x = as.numeric(X),
+                y = as.numeric(Y))
+               
+    return(zcovs)
+  }
+  zcovs_den_mwepa <- standardize_mwepa_covs(grid_covs, mu.sd = data_den_stats)
+  zcovs_rnd_mwepa <- standardize_mwepa_covs(grid_covs, mu.sd = data_rnd_stats)
+  
+  #'  Function to save parameter estimates from each model
+  rsf_out <- function(mod){
+    beta <- mod$coefficients
+    out <- as.data.frame(beta) %>%
+      mutate(Parameter = row.names(.),
+             Parameter = ifelse(Parameter == "(Intercept)", "alpha", Parameter),
+             Parameter = ifelse(Parameter == "Elev", "b.elev", Parameter),
+             Parameter = ifelse(Parameter == "Slope", "b.slope", Parameter),
+             Parameter = ifelse(Parameter == "Rough", "b.rough", Parameter),
+             Parameter = ifelse(Parameter == "Curve", "b.curve", Parameter),
+             Parameter = ifelse(Parameter == "Dist2Water", "b.water", Parameter),
+             Parameter = ifelse(Parameter == "HumanMod", "b.hm", Parameter),
+             Parameter = ifelse(Parameter == "Dist2Road", "b.road", Parameter),
+             Parameter = ifelse(Parameter == "CanopyCov", "b.canopy", Parameter),
+             Parameter = ifelse(Parameter == "CanopyCov:AvgCanopyCov", "b.canopyXavgcanopy", Parameter),
+             Parameter = ifelse(Parameter == "SeasonalNDVI", "b.ndvi", Parameter),
+             Parameter = ifelse(Parameter == "SeasonalNDVI:AvgSeasonalNDVI", "b.ndviXavgndvi", Parameter)) %>%
+      relocate(Parameter, .before = beta) %>%
+      #'  Spread data so each coefficient is it's own column
+      pivot_wider(names_from = Parameter, values_from = beta) 
+    
+    return(out)
+  }
+  #'  Extract coefficient estimates for each trained model
+  coefs_h4.den <- rsf_out(h4.den)
+  coefs_h2.rnd <- rsf_out(h2.rnd)
+  
+  ####  Predict across suitable habitat ####
+  #'  ----------------------------------
+  #'  Functions to predict across all grid cells based on RSF results
+  #'  NOTE: want the predict relative probability of selection from RSF so not 
+  #'  using a logit transformation. Drop intercept from the model and exponentiate 
+  #'  coefs*covs (Fieberg et al. 2020)
+  predict_den_rsf <- function(coef, cov) {
+    #'  Generate modified canopy cover variable
+    
+    predict_rsf <- c()
+    #'  Predict across each grid cell
+    for(i in 1:nrow(cov)) {
+      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.slope*cov$Slope[i] + 
+                              coef$b.rough*cov$Rough[i] + coef$b.water*cov$Dist2Water[i] + 
+                              coef$b.canopy*cov$CanopyCov[i] + 
+                              coef$b.canopyXavgcanopy*cov$ModifiedCanopyCov[i] + 
+                              coef$b.hm*cov$HumanMod[i] + coef$b.road*cov$Dist2Road[i])}  
+    predict_rsf <- as.data.frame(predict_rsf)
+    predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
+    colnames(predict_rsf) <- c("ID", "x", "y", "predict_rsf")
+    
+    return(predict_rsf)
+  }
+  #'  Predict relative probability of selection for den habitat across MWEPA for k training models 
+  den_h4.predict <- predict_den_rsf(coefs_h4.den, cov = zcovs_den_mwepa)
+  head(den_h4.predict); head(den_h4.predict)
+  
+  save(den_h4.predict, file = "./Outputs/den_h4.predict.RData")
+  
+  predict_rnd_rsf <- function(coef, cov) {
+    predict_rsf <- c()
+    #'  Predict across each grid cell
+    for(i in 1:nrow(cov)) {
+      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.rough*cov$Rough[i] + 
+                              coef$b.curve*cov$Curve[i] + coef$b.water*cov$Dist2Water[i] + 
+                              coef$b.ndvi*cov$SeasonalNDVI[i] + coef$b.ndviXavgndvi*cov$ModifiedNDVI[i])}
+    predict_rsf <- as.data.frame(predict_rsf)
+    predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
+    colnames(predict_rsf) <- c("ID", "x", "y", "predict_rsf")
+    
+    return(predict_rsf)
+  }
+  #'  Predict relative probability of selection for rendezvous habitat across MWEPA for k training models 
+  rnd_h2.predict <- predict_rnd_rsf(coefs_h2.rnd, cov = zcovs_rnd_mwepa)
+  head(rnd_h2.predict); head(rnd_h2.predict)
+  
+  save(rnd_h2.predict, file = "./Outputs/rnd_h2.predict.RData")
+  
+  ######  Map predicted habitat selection  ######
+  #'  -------------------------------------
+  
+  
+  #####  Functional response to available NDVI  ####
+  #'  ------------------------------------------
+  #'  Create range of meanNDVI values to predict across and standardize
+  min_meanNDVI <- min(all_data_rnd$meanNDVI)
+  max_meanNDVI <- max(all_data_rnd$meanNDVI)
+  range_meanNDVI <- seq(min_meanNDVI, max_meanNDVI, length.out = 500)
+  range_meanNDVIz <- (range_meanNDVI - mean(all_data_rnd$meanNDVI))/sd(all_data_rnd$meanNDVI)
+  #'  Identify min, mean & max available meanNDVI across MCP during rnd season (unstandardized)
+  min_avg_MCP_meanNDVI <- min(all_data_rnd$avg_MCP_meanNDVI)
+  mean_avg_MCP_meanNDVI <- mean(all_data_rnd$avg_MCP_meanNDVI)
+  max_avg_MCP_meanNDVI <- max(all_data_rnd$avg_MCP_meanNDVI)
+  #'  Center and scale
+  min_avg_MCP_meanNDVIz <- (min_avg_MCP_meanNDVI - data_rnd_stats$avg_MCP_meanNDVI[1])/data_rnd_stats$avg_MCP_meanNDVI[2]
+  mean_avg_MCP_meanNDVIz <- (mean_avg_MCP_meanNDVI - data_rnd_stats$avg_MCP_meanNDVI[1])/data_rnd_stats$avg_MCP_meanNDVI[2]
+  max_avg_MCP_meanNDVIz <- (max_avg_MCP_meanNDVI - data_rnd_stats$avg_MCP_meanNDVI[1])/data_rnd_stats$avg_MCP_meanNDVI[2]
+  #'  Create modified covariate (meanNDVI*avg_MCP_meanNDIV)
+  min_ModifiedNDVIz <- range_meanNDVIz*min_avg_MCP_meanNDVIz
+  mean_ModifiedNDVIz <- range_meanNDVIz*mean_avg_MCP_meanNDVIz
+  max_ModifiedNDVIz <- range_meanNDVIz*max_avg_MCP_meanNDVIz
+  
+  #' #'  Create input data set for predictions
+  #' func_rsp_df <- function(zcov, modNDVI) {
+  #'   dat <- dplyr::select(zcov, c("Elev", "Rough", "Curve", "SeasonalNDVI", "AvgSeasonalNDVI", "Dist2Water"))
+  #'   dat <- dat[1:500,]
+  #'   dat <- mutate(dat, Elev = 0)
+  #'   dat$Elev <- c(0)
+  #'   dat$Rough <- c(0)
+  #'   dat$Curve <- c(0)
+  #'   dat$SeasonalNDVI <- c(range_meanNDVIz)
+  #'   dat$AvgSeasonalNDVI <- c(modNDVI)
+  #'   dat$Dist2Water <- c(0)
+  #'   dat$meanNDVI <- range_meanNDVI
+  #'   return(dat)
+  #' }
+  #' func_rsp_AvailNDIV_low <- func_rsp_df(rnd_dataz, min_avg_MCP_meanNDVIz)
+  #' func_rsp_AvailNDIV_mid <- func_rsp_df(rnd_dataz, mean_avg_MCP_meanNDVIz)
+  #' func_rsp_AvailNDIV_high <- func_rsp_df(rnd_dataz, max_avg_MCP_meanNDVIz)
+  #' 
+  #' functional_response_rnd_rsf <- function(mod, cov, availndvi) { 
+  #'   #'  Predict across range of NDVI values while holding all other covs at their mean
+  #'   #'  (which is 0 since working with standardized covariates) 
+  #'   predict_rsf <- predict(mod, newdata = func_rsp_AvailNDIV_low, type = "terms", se.fit = TRUE) 
+  #'   #'  Grab fitted values and SEs
+  #'   predicted_response <- as.data.frame(predict_rsf[[1]])
+  #'   predicted_response <- predicted_response$SeasonalNDVI
+  #'   predicted_se <- as.data.frame(predict_rsf[[2]])
+  #'   predicted_se <- predicted_se$SeasonalNDVI
+  #'   predict_intercept <- attributes(predict(mod, newdata = func_rsp_AvailNDIV_low, type = 'terms'))$constant 
+  #'   #'  Create data frame of NDVI effect and prediction intervals
+  #'   predicted_effect <- cbind(predicted_response, predicted_se) 
+  #'   names(predicted_effect) <- c("predicted_response", "predicted_se")
+  #'   predicted_effect <- as.data.frame(predicted_effect) %>% 
+  #'     mutate(NDVI = predicted_response,
+  #'            lci = NDVI - (predicted_se*1.96),
+  #'            uci = NDVI + (predicted_se*1.96),
+  #'            Average_AvailNDVI = availndvi,
+  #'            meanNDVI = cov$meanNDVI)
+  #'   return(predicted_effect)
+  #' }
+  #' #'  Predict relative probability of selection for rendezvous habitat across MWEPA for k training models 
+  #' rnd_h2.predict_AvgNDVI_low <- functional_response_rnd_rsf(h2.rnd, cov = func_rsp_AvailNDIV_low, availndvi = "Low"); head(rnd_h2.predict_AvgNDVI_low); tail(rnd_h2.predict_AvgNDVI_low)
+  #' rnd_h2.predict_AvgNDVI_mid <- functional_response_rnd_rsf(h2.rnd, cov = func_rsp_AvailNDIV_mid, availndvi = "Medium")
+  #' rnd_h2.predict_AvgNDVI_high <- functional_response_rnd_rsf(h2.rnd, cov = func_rsp_AvailNDIV_high, availndvi = "High")
+  #' 
+  #' #'  Create one data frame with all predictions
+  #' rnd_h2.predict_AvailAvgNDVI <- bind_rows(rnd_h2.predict_AvgNDVI_low, rnd_h2.predict_AvgNDVI_mid, rnd_h2.predict_AvgNDVI_high) %>%
+  #'   mutate(Average_AvailNDVI = factor(Average_AvailNDVI, levels = c("Low", "Medium", "High")))
+  
+  #'  Create input data set for predictions
+  func_rsp_df <- function(modNDVI) {
+    AvailNDIV <- bind_cols(range_meanNDVI, range_meanNDVIz, modNDVI) %>%
+      as.data.frame(.)
+    names(AvailNDIV) <- c("meanNDVI", "meanNDVIz", "ModifiedNDVIz")
+    return(AvailNDIV)
+  }
+  func_rsp_AvailNDIV_low <- func_rsp_df(min_ModifiedNDVIz); head(func_rsp_AvailNDIV_low); tail(func_rsp_AvailNDIV_low)
+  func_rsp_AvailNDIV_mid <- func_rsp_df(mean_ModifiedNDVIz); head(func_rsp_AvailNDIV_mid); tail(func_rsp_AvailNDIV_mid)
+  func_rsp_AvailNDIV_high <- func_rsp_df(max_ModifiedNDVIz); head(func_rsp_AvailNDIV_high); tail(func_rsp_AvailNDIV_high)
+
+  #'  Predict across range of meanNDVI and different levels of average meanNDVI
+  #'  across MCP during rnd season
+  functional_response_rnd_rsf <- function(coef, cov) {
+    #'  Predict across range of NDVI values while holding all other covs at their mean
+    #'  (which is 0 since working with standardized covariates)
+    predict_rsf <- exp(coef$b.elev*0 + coef$b.rough*0 + coef$b.curve*0 + coef$b.water*0 +
+                         coef$b.ndvi*cov$meanNDVIz + coef$b.ndviXavgndvi*cov$ModifiedNDVIz)
+    #'  Create a data frame with raw NDVI, standardized NDVI, and predicted RSF
+    predict_rsf <- as.data.frame(predict_rsf)
+    predict_rsf <- bind_cols(cov$meanNDVI, cov$meanNDVIz, cov$ModifiedNDVIz, predict_rsf)
+    colnames(predict_rsf) <- c("meanNDVI", "meanNDVIz", "ModifiedNDVIz", "predict_rsf")
+    return(predict_rsf)
+  }
+  #'  Predict relative probability of selection for rendezvous habitat across MWEPA for k training models
+  rnd_h2.predict_AvgNDVI_low <- functional_response_rnd_rsf(coefs_h2.rnd, cov = func_rsp_AvailNDIV_low) %>%
+    mutate(Average_AvailNDVI = "Low"); head(rnd_h2.predict_AvgNDVI_low); tail(rnd_h2.predict_AvgNDVI_low)
+  rnd_h2.predict_AvgNDVI_mid <- functional_response_rnd_rsf(coefs_h2.rnd, cov = func_rsp_AvailNDIV_mid) %>%
+    mutate(Average_AvailNDVI = "Medium"); head(rnd_h2.predict_AvgNDVI_mid); tail(rnd_h2.predict_AvgNDVI_mid)
+  rnd_h2.predict_AvgNDVI_high <- functional_response_rnd_rsf(coefs_h2.rnd, cov = func_rsp_AvailNDIV_high) %>%
+    mutate(Average_AvailNDVI = "High"); head(rnd_h2.predict_AvgNDVI_high); tail(rnd_h2.predict_AvgNDVI_high)
+
+  #'  Create one data frame with all predictions
+  rnd_h2.predict_AvailAvgNDVI <- bind_rows(rnd_h2.predict_AvgNDVI_low, rnd_h2.predict_AvgNDVI_mid, rnd_h2.predict_AvgNDVI_high) %>%
+    mutate(Average_AvailNDVI = factor(Average_AvailNDVI, levels = c("Low", "Medium", "High")))
+  
+  #'  Plot with three slope (min, mean, max) and prediction intervals (NEED TO FIGURE OUT HOW TO CALCULATE VARIANCE!)
+  NDVI_functional_response_plot <- ggplot(rnd_h2.predict_AvailAvgNDVI, 
+                                          aes(x = meanNDVI, y = predict_rsf, color = Average_AvailNDVI)) +
+    geom_line() +
+    #' #'  Add intervals
+    #' geom_ribbon(aes(ymin = lci, ymax = uci, color = Average_AvailNDVI), alpha = 0.3) +
+    geom_hline(yintercept = 1.0, linetype = 'dashed', col = 'gray15')+
+    theme_bw() +
+    theme(text = element_text(size = 18)) +
+    xlab("Mean NDVI within 250m radius of site") +
+    ylab("Relative selection strength") + 
+    labs(color = "Average available \ngreenleaf biomass") +
+    ggtitle("Predicted functional response to NDVI as availability changes")
+  NDVI_functional_response_plot
+  
+  ggsave("./Outputs/Figures/NDVI_functional_response_plot.tiff", NDVI_functional_response_plot, 
+         units = "in", height = 8, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
+  
   
   
   
