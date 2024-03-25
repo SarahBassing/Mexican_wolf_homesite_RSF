@@ -458,8 +458,10 @@
   rnd_predict_rast <- rasterize_rsf(rnd_predict_binned)
   
   #'  Save rasterized binned RSFs
-  save(den_predict_rast, file = "./Shapefiles/Predicted RSFs/den_predict_rasters.RData")
-  save(rnd_predict_rast, file = "./Shapefiles/Predicted RSFs/rnd_predict_rasters.RData")
+  writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster.tif", overwrite = TRUE)
+  writeRaster(rnd_predict_rast, filename = "./Shapefiles/Predicted RSFs/rnd_predict_raster.tif", overwrite = TRUE)
+  save(den_predict_rast, file = "./Shapefiles/Predicted RSFs/den_predict_raster.RData")
+  save(rnd_predict_rast, file = "./Shapefiles/Predicted RSFs/rnd_predict_raster.RData")
   
   #'  Map predicted RSFs
   #'  Define color palette (only bins 7-10 really identifiable)
