@@ -22,6 +22,7 @@
   #'  -------------------------
   #'  Load spatial data
   dem <- terra::rast("./Shapefiles/Terrain_variables/Mosaic_DEM.tif"); res(dem); st_crs(dem)
+  nad83 <- crs(dem)
   
   #####  Generate terrain data from DEM  #####
   #'  -----------------------------------
@@ -113,6 +114,31 @@
   st_write(suitable_niche_sf, "./Shapefiles/Martinez_Meyer_2021_layers/suitable_climatic.shp")
   st_write(low_human_pop, "./Shapefiles/Martinez_Meyer_2021_layers/low_human_density.shp")
   st_write(suitable_low_ppl, "./Shapefiles/Martinez_Meyer_2021_layers/suitable_habitat.shp")
+  
+  #'  ------------------------
+  ####  Resample all rasters  ####
+  #'  ------------------------
+  elev <- terra::rast("./Shapefiles/Terrain_variables/Mosaic_DEM.tif"); res(elev); crs(elev); st_bbox(elev)
+  slope <- terra::rast("./Shapefiles/Terrain_variables/slope.tif"); res(slope); crs(slope); st_bbox(slope)
+  rough <- terra::rast("./Shapefiles/Terrain_variables/VRM.tif"); res(rough); crs(rough); st_bbox(rough)
+  curve <- terra::rast("./Shapefiles/Terrain_variables/Gaussian_curvature.tif"); res(curve); crs(curve); st_bbox(curve)
+  water <- terra::rast("./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water.tif"); res(water); crs(water); st_bbox(water)
+  human_mod <- terra::rast("./Shapefiles/Human_variables/mosaic_global_Human_Modification.tif"); res(human_mod); crs(human_mod); st_bbox(human_mod)
+  roads <- terra::rast("./Shapefiles/Human_variables/mosaic_dist2road.tif"); res(roads); crs(roads); st_bbox(roads)
+  # ext(water) <- ext(elev)
+  # ext(human_mod) <- ext(elev)
+  # ext(roads) <- ext(elev)
+  # st_bbox(elev); st_bbox(slope); st_bbox(water); st_bbox(roads)
+  # dim(elev); dim(slope); dim(water); dim(human_mod); dim(roads)
+  # water_resampled <- resample(water, elev, method = "bilinear", filename = "./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water_resampled.tif")
+  # human_mod_resampled <- resample(human_mod, elev)
+  # roads_resampled <- resample(roads, elev)
+  # st_bbox(elev); st_bbox(slope); st_bbox(water_resampled); st_bbox(roads_resampled); st_bbox(human_mod_resampled)
+  # dim(elev); dim(slope); dim(water_resampled); dim(human_mod_resampled); dim(roads_resampled)
+  # 
+  # writeRaster(water_resampled, "./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water_resampled.tif")
+  # writeRaster(human_mod_resampled, "./Shapefiles/Human_variables/mosaic_global_Human_Modification_resampled.tif")
+  # writeRaster(roads_resampled, "./Shapefiles/Human_variables/mosaic_dist2road_resampled.tif")
   
   #'  -------------------------------------
   ####  Exported Google Earth Engine data  ####
@@ -270,29 +296,60 @@
   write_csv(percent_canopy_den, "./Data/GEE extracted data/percent_canopy_denSeason.csv")
   write_csv(percent_canopy_rnd, "./Data/GEE extracted data/percent_canopy_rndSeason.csv")
   
+  
   ######  2022 canopy cover MWEPA grid  ######
   #'  ----------------------------------
-  #'  Merge pieces of 2000 canopy cover data for entire MWEPA suitable grid
-  canopy_grid <-list.files(path = "./Data/GEE extracted data/MWEPA suitable grid 2000 canopy/", pattern = "\\.csv$", full.names = T) %>%
-    map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
-    dplyr::select(-c(`system:index`,`.geo`))
-  write_csv(canopy_grid, "./Data/GEE extracted data/GEE_2000_canopy_cover_grid.csv")
+  #' #'  Merge pieces of 2000 canopy cover data for entire MWEPA suitable grid
+  #' canopy_grid <-list.files(path = "./Data/GEE extracted data/MWEPA suitable grid 2000 canopy/", pattern = "\\.csv$", full.names = T) %>%
+  #'   map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
+  #'   dplyr::select(-c(`system:index`,`.geo`))
+  #' write_csv(canopy_grid, "./Data/GEE extracted data/GEE_2000_canopy_cover_grid.csv")
+  #' 
+  #' #'  Merge pieces of 2022 canopy loss data for entire MWEPA suitable grid
+  #' loss_grid <-list.files(path = "./Data/GEE extracted data/MWEPA suitable grid 2022 canopy loss/", pattern = "\\.csv$", full.names = T) %>%
+  #'   map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
+  #'   dplyr::select(-c(`system:index`,`.geo`))
+  #' write_csv(loss_grid, "./Data/GEE extracted data/GEE_accu_canopy_loss_2022_grid.csv")
   
-  #'  Merge pieces of 2022 canopy loss data for entire MWEPA suitable grid
-  loss_grid <-list.files(path = "./Data/GEE extracted data/MWEPA suitable grid 2022 canopy loss/", pattern = "\\.csv$", full.names = T) %>%
-    map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
-    dplyr::select(-c(`system:index`,`.geo`))
-  write_csv(loss_grid, "./Data/GEE extracted data/GEE_accu_canopy_loss_2022_grid.csv")
+  #'  Load MWEPA-wide 2000 canopy cover and accumulated area lost through 2022
+  canopy_cover_mwepa <- terra::rast("./Shapefiles/Vegetation_variables/Resampled_CanopyCover_2000_movingwindow.tif"); crs(canopy_cover_mwepa); st_bbox(canopy_cover_mwepa)
+  acculoss_2022_mwepa <- terra::rast("./Shapefiles/Vegetation_variables/Resampled_lossAccu2022_reduceNeighborhood.tif"); crs(acculoss_2022_mwepa); st_bbox(acculoss_2022_mwepa)
+  dim(acculoss_2022_mwepa); dim(canopy_cover_mwepa)
+  
+  #'  Load reference grid and extract canopy data at each point
+  grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp") %>%
+    st_transform(crs = nad83); crs(grid_pts)
+  canopy_grid <- terra::extract(canopy_cover_mwepa, grid_pts)
+  loss_grid <- terra::extract(acculoss_2022_mwepa, grid_pts)
+  
+  head(canopy_grid); head(loss_grid)
+  
+  # ext(canopy_cover_mwepa) <- ext(elev)
+  # ext(acculoss_2022_mwepa) <- ext(elev)
+  # canopy_cover_mwepa_resampled <- resample(canopy_cover_mwepa, elev)
+  # acculoss_2022_mwepa_resampled <- resample(acculoss_2022_mwepa, elev)
+  # st_bbox(elev); st_bbox(canopy_cover_mwepa_resampled); st_bbox(acculoss_2022_mwepa_resampled)
+  # dim(elev); dim(canopy_cover_mwepa_resampled); dim(acculoss_2022_mwepa_resampled)
+  # 
+  # Mean_2000_CC_percent <- canopy_cover_mwepa_resampled/100
+  # BufferArea_sq_m <- bufferedArea # from calculations way above
+  # PropLost <- acculoss_2022_mwepa_resampled/BufferArea_sq_m
+  # PercentLost <- (PropLost * canopy_cover_mwepa)
+  # Mean_percent_canopy <- Mean_2000_CC_percent - PercentLost
+  # mean_cover_2022_grid <- mean(Mean_percent_canopy)
   
   #'  Calculate 2022 canopy cover using 2000 baseline and accumulated loss area
-  percent_canopy_2022_grid <- full_join(canopy_grid, loss_grid, by = c("cellID", "newID")) %>%
+  percent_canopy_2022_grid <- full_join(canopy_grid, loss_grid, by = "ID") %>% #by = c("cellID", "newID")
     mutate(BufferArea_sq_m = bufferedArea) %>%
-    rename("lossYr_2022" = "sum") %>% 
-    rename("Mean_canopy_cover_2000" = "mean") %>%
-    relocate(newID, .after = cellID) %>%
+    rename("lossYr_2022" = "Resampled_lossAccu2022_reduceNeighborhood") %>%
+    rename("Mean_canopy_cover_2000" = "Resampled_CanopyCover_2000_movingwindow") %>%
+    # rename("lossYr_2022" = "sum") %>% 
+    # rename("Mean_canopy_cover_2000" = "mean") %>%
+    # relocate(newID, .after = cellID) %>%
     #'  Make sure canopy cover and area loss are numeric
     mutate(Mean_canopy_cover_2000 = as.numeric(Mean_canopy_cover_2000),
            lossYr_2022 = as.numeric(lossYr_2022),
+           lossYr_2022 = ifelse(is.na(lossYr_2022), 0, lossYr_2022),
            #'  Put mean % canopy cover in a real percentage
            Mean_2000_CC_percent = Mean_canopy_cover_2000/100,
            #'  Calculate proportion of area within buffer that was lost over time
@@ -303,7 +360,7 @@
            Mean_percent_canopy = Mean_2000_CC_percent - PercentLost) %>%
     rename("canopy_cov_2000" = "Mean_2000_CC_percent") %>%
     relocate(canopy_cov_2000, .after = Mean_canopy_cover_2000) %>%
-    dplyr::select(cellID, newID, Mean_percent_canopy)
+    dplyr::select(ID, Mean_percent_canopy)
   
   #'  2022 canopy cover, averaged across entire study area
   mean_cover_2022_grid <- mean(percent_canopy_2022_grid$Mean_percent_canopy) 
@@ -312,7 +369,7 @@
   percent_canopy_grid <- percent_canopy_2022_grid %>%
     mutate(avg_MWEPA_canopycover = mean_cover_2022_grid)
   
-  write_csv(percent_canopy_grid, "./Data/GEE extracted data/GEE_percent_canopy_2022_grid.csv")
+  write_csv(percent_canopy_grid, "./Data/GEE extracted data/Resampled_percent_canopy_2022_grid.csv")
   
   #####  Mean Seasonal Greenness  #####
   #'  ---------------------------
