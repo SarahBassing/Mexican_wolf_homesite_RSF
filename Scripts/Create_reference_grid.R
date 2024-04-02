@@ -58,9 +58,9 @@
   
   #####  Mask out unsuitable areas to reduce pixels  #####
   #"  -----------------------------------------------
-  #' #'  Load emtpy raster
-  #' empty_rast <- terra::rast("./Shapefiles/Reference_grid_30m.tif")
-  
+  #'  Load emtpy raster
+  empty_rast <- terra::rast("./Shapefiles/Reference_grid_30m.tif")
+
   #'  Mask out waterbodies
   masked_water <- mask(empty_rast, bigwater_nad83, inverse = TRUE)
   plot(masked_water)
@@ -74,18 +74,20 @@
   
   #####  Extract pixel centroids  #####
   #'  ----------------------------
-  #' #'  Load masked reference grid
-  #' wmepa_grid <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif")
+  #'  Load masked reference grid
+  wmepa_grid <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif")
   
   #'  Convert grid to a polygon and sf object #### THIS TAKES FOREVER!!!
-  wmepa_poly <- as.polygons(wmepa_grid)    
-  # wmepa_poly <- as.polygons(wmepa_grid, aggregate = FALSE, values = TRUE, extent = TRUE, na.rm = TRUE) 
-  wmepa_poly_sf <- st_as_sf(wmepa_poly)
+  # wmepa_poly <- as.polygons(wmepa_grid)
+  # wmepa_poly <- as.polygons(empty_rast)  # Too big... couldn't do it with a week of processing time
+  wmepa_poly2 <- as.polygons(wmepa_grid, aggregate = FALSE, values = TRUE, extent = TRUE, na.rm = TRUE) 
+  wmepa_poly_sf <- st_as_sf(wmepa_poly2)
   # one_cell <- wmepa_poly_sf[1,]
   # st_area(one_cell)
   
   #'  Save so I never have to do that again!
-  st_write(wmepa_poly_sf, "./Shapefiles/WMEPA_masked_polygon.shp")
+  # st_write(wmepa_poly_sf, "./Shapefiles/WMEPA_masked_polygon.shp")
+  # st_write(wmepa_poly_sf, "./Shapefiles/WMEPA_NOmask_polygon.shp")
   
   #'  Grab centroid of each pixel
   wmepa_grid_centroid <- st_centroid(wmepa_poly_sf)
@@ -102,10 +104,11 @@
   wmepa_grid_pts <- bind_cols(wmepa_grid_cellID, wmepa_grid_coords)
   
   #'  Save!
-  write_csv(wmepa_grid_pts, file = "./Data/WMEPA_suitable_grid_points.csv")
+  write_csv(wmepa_grid_pts, file = "./Data/WMEPA_suitable_grid_points2.csv")
+  # write_csv(wmepa_grid_pts, file = "./Data/WMEPA_grid_points.csv")
   
   #'  Convert dataframe to shapefiles
-  wmepa_grid_pts <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
+  # wmepa_grid_pts <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
   
   #'  Convert to an sf object
   wmepa_grid_pts <- st_as_sf(wmepa_grid_pts, coords = c("X", "Y"), crs = nad83) %>%
@@ -115,7 +118,8 @@
     mutate(newID = 1:nrow(.))
   
   #'  Save the new suitable MWEPA grid as a shapefile
-  st_write(wmepa_grid_pts, "./Shapefiles/MWEPA_suitable_reference_grid.shp")
+  st_write(wmepa_grid_pts, "./Shapefiles/MWEPA_suitable_reference_grid2.shp")
+  # st_write(wmepa_grid_pts, "./Shapefiles/MWEPA_reference_grid.shp")
   
   #'  Slit massive sf object into more manageable chunks (needed for Google Earth Engine)
   #'  Some of these are split into even smaller pieces b/c GEE had issues with the
