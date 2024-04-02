@@ -31,13 +31,13 @@
     relocate(Pack_year, .before = Year)
     
   #'  Spatial data (rasters)
-  elev <- terra::rast("./Shapefiles/Terrain_variables/Mosaic_DEM.tif"); res(elev); crs(elev)
-  slope <- terra::rast("./Shapefiles/Terrain_variables/slope.tif"); res(slope); crs(slope)
-  rough <- terra::rast("./Shapefiles/Terrain_variables/VRM.tif"); res(rough); crs(rough)
-  curve <- terra::rast("./Shapefiles/Terrain_variables/Gaussian_curvature.tif"); res(curve); crs(curve)
-  water <- terra::rast("./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water.tif"); res(water); crs(water)
-  human_mod <- terra::rast("./Shapefiles/Human_variables/mosaic_global_Human_Modification.tif"); res(human_mod); crs(human_mod)
-  roads <- terra::rast("./Shapefiles/Human_variables/mosaic_dist2road.tif"); res(roads); crs(roads)
+  elev <- terra::rast("./Shapefiles/Terrain_variables/Mosaic_DEM.tif"); res(elev); crs(elev); st_bbox(elev)
+  slope <- terra::rast("./Shapefiles/Terrain_variables/slope.tif"); res(slope); crs(slope); st_bbox(slope)
+  rough <- terra::rast("./Shapefiles/Terrain_variables/VRM.tif"); res(rough); crs(rough); st_bbox(rough)
+  curve <- terra::rast("./Shapefiles/Terrain_variables/Gaussian_curvature.tif"); res(curve); crs(curve); st_bbox(curve)
+  water <- terra::rast("./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water.tif"); res(water); crs(water); st_bbox(water)
+  human_mod <- terra::rast("./Shapefiles/Human_variables/mosaic_global_Human_Modification.tif"); res(human_mod); crs(human_mod); st_bbox(human_mod)
+  roads <- terra::rast("./Shapefiles/Human_variables/mosaic_dist2road.tif"); res(roads); crs(roads); st_bbox(roads)
   
   #'  Define WGS84 coordinate systems
   wgs84 <- st_crs("+proj=longlat +datum=WGS84 +no_defs")
