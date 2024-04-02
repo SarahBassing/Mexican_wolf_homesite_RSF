@@ -80,8 +80,8 @@
   #'  Convert grid to a polygon and sf object #### THIS TAKES FOREVER!!!
   # wmepa_poly <- as.polygons(wmepa_grid)
   # wmepa_poly <- as.polygons(empty_rast)  # Too big... couldn't do it with a week of processing time
-  wmepa_poly2 <- as.polygons(wmepa_grid, aggregate = FALSE, values = TRUE, extent = TRUE, na.rm = TRUE) 
-  wmepa_poly_sf <- st_as_sf(wmepa_poly2)
+  # wmepa_poly2 <- as.polygons(wmepa_grid, aggregate = FALSE) # Error: [as.polygons] the raster is too large
+  wmepa_poly_sf <- st_as_sf(wmepa_poly)
   # one_cell <- wmepa_poly_sf[1,]
   # st_area(one_cell)
   
@@ -104,7 +104,7 @@
   wmepa_grid_pts <- bind_cols(wmepa_grid_cellID, wmepa_grid_coords)
   
   #'  Save!
-  write_csv(wmepa_grid_pts, file = "./Data/WMEPA_suitable_grid_points2.csv")
+  write_csv(wmepa_grid_pts, file = "./Data/WMEPA_suitable_grid_points.csv")
   # write_csv(wmepa_grid_pts, file = "./Data/WMEPA_grid_points.csv")
   
   #'  Convert dataframe to shapefiles
