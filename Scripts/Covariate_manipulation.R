@@ -317,8 +317,9 @@
   dim(acculoss_2022_mwepa); dim(canopy_cover_mwepa)
   
   #'  Load reference grid and extract canopy data at each point
-  grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp") %>%
-    st_transform(crs = nad83); crs(grid_pts)
+  grid_pts <- st_read("./Shapefiles/WMEPA_grid_clip_pts.shp"); crs(grid_pts)
+  # grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp") %>%
+  #   st_transform(crs = nad83); crs(grid_pts)
   canopy_grid <- terra::extract(canopy_cover_mwepa, grid_pts)
   loss_grid <- terra::extract(acculoss_2022_mwepa, grid_pts)
   
