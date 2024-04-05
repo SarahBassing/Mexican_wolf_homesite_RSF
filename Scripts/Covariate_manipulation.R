@@ -318,6 +318,7 @@
   
   #'  Load reference grid and extract canopy data at each point
   grid_pts <- st_read("./Shapefiles/WMEPA_grid_clip_pts.shp"); crs(grid_pts)
+  xy <- st_coordinates(grid_pts)
   # grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp") %>%
   #   st_transform(crs = nad83); crs(grid_pts)
   canopy_grid <- terra::extract(canopy_cover_mwepa, grid_pts)
@@ -368,7 +369,8 @@
   
   #'  Add 2022 study area average canopy cover to 2022 canopy cover data set
   percent_canopy_grid <- percent_canopy_2022_grid %>%
-    mutate(avg_MWEPA_canopycover = mean_cover_2022_grid)
+    mutate(avg_MWEPA_canopycover = mean_cover_2022_grid) %>%
+    cbind(xy)
   
   write_csv(percent_canopy_grid, "./Data/GEE extracted data/Resampled_percent_canopy_2022_grid.csv")
   
