@@ -326,20 +326,6 @@
   
   head(canopy_grid); head(loss_grid)
   
-  # ext(canopy_cover_mwepa) <- ext(elev)
-  # ext(acculoss_2022_mwepa) <- ext(elev)
-  # canopy_cover_mwepa_resampled <- resample(canopy_cover_mwepa, elev)
-  # acculoss_2022_mwepa_resampled <- resample(acculoss_2022_mwepa, elev)
-  # st_bbox(elev); st_bbox(canopy_cover_mwepa_resampled); st_bbox(acculoss_2022_mwepa_resampled)
-  # dim(elev); dim(canopy_cover_mwepa_resampled); dim(acculoss_2022_mwepa_resampled)
-  # 
-  # Mean_2000_CC_percent <- canopy_cover_mwepa_resampled/100
-  # BufferArea_sq_m <- bufferedArea # from calculations way above
-  # PropLost <- acculoss_2022_mwepa_resampled/BufferArea_sq_m
-  # PercentLost <- (PropLost * canopy_cover_mwepa)
-  # Mean_percent_canopy <- Mean_2000_CC_percent - PercentLost
-  # mean_cover_2022_grid <- mean(Mean_percent_canopy)
-  
   #'  Calculate 2022 canopy cover using 2000 baseline and accumulated loss area
   percent_canopy_2022_grid <- full_join(canopy_grid, loss_grid, by = "ID") %>% #by = c("cellID", "newID")
     mutate(BufferArea_sq_m = bufferedArea) %>%
