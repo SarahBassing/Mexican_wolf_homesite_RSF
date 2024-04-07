@@ -360,32 +360,26 @@
   
   write_csv(percent_canopy_grid, "./Data/GEE extracted data/Resampled_percent_canopy_2022_grid.csv")
   
+  #'  Rearrange so it's easier to rasterize
   percent_canopy_2022_grid <- percent_canopy_grid %>%
     transmute(x = X,
               y = Y,
               ID = ID,
-              Mean_percent_canopy = Mean_percent_canopy)
-  
-  average_canopy_2022_grid <- percent_canopy_grid %>%
-    transmute(x = X,
-              y = Y,
-              ID = ID,
+              Mean_percent_canopy = Mean_percent_canopy,
               avg_MWEPA_canopycover = avg_MWEPA_canopycover)
   
+  #'  Grab coordinate system info
   ref_grid <- terra::rast("./Shapefiles/WMEPA_buffer_grid_clip.tif")
   nad83 <- crs(ref_grid)
   
   #'  Rasterize Canopy Cover data
-  #'  Use MWEPA masked grid as the template for rasterizing so the resolution, extent, and coordinate system are correct
   percent_canopy_2022_raster <- terra::rast(percent_canopy_2022_grid, type = "xyz", crs = nad83, digits = 6, extent = NULL)
-  avg_canopy_2022_raster <- terra::rast(average_canopy_2022_grid, type = "xyz", crs = nad83, digits = 6, extent = NULL)
   
   plot(percent_canopy_2022_raster[[2]])
-  plot(avg_canopy_2022_raster[[2]])
+  plot(percent_canopy_2022_raster[[3]])
   
   #'  Save
-  writeRaster(percent_canopy_2022_raster, "./Shapefiles/percent_canopy_2022_raster.tif")
-  writeRaster(avg_canopy_2022_raster, "./Shapefiles/avg_canopy_2022_raster.tif")
+  writeRaster(percent_canopy_2022_raster, "./Shapefiles/Vegetation_variables/percent_canopy_2022_raster.tif", overwrite = TRUE)
   
   
   #####  Mean Seasonal Greenness  #####
