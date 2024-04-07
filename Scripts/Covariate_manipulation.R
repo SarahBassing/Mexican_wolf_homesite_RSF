@@ -360,6 +360,28 @@
   
   write_csv(percent_canopy_grid, "./Data/GEE extracted data/Resampled_percent_canopy_2022_grid.csv")
   
+  percent_canopy_2022_grid <- percent_canopy_grid %>%
+    transmute(x = X,
+              y = Y,
+              ID = ID,
+              Mean_percent_canopy = Mean_percent_canopy)
+  
+  average_canopy_2022_grid <- percent_canopy_grid %>%
+    transmute(x = X,
+              y = Y,
+              ID = ID,
+              avg_MWEPA_canopycover = avg_MWEPA_canopycover)
+  
+  #'  Rasterize Canopy Cover data
+  #'  Use MWEPA masked grid as the template for rasterizing so the resolution, extent, and coordinate system are correct
+  percent_canopy_2022_raster <- st_rasterize(percent_canopy_2022_grid %>% template = read_stars("./Shapefiles/WMEPA_buffer_grid_clip.tif"), align = TRUE)
+  avg_canopy_2022_raster <- st_rasterize(average_canopy_2022_grid %>% template = read_stars("./Shapefiles/WMEPA_buffer_grid_clip.tif"), align = TRUE)
+  
+  #'  Save
+  write_stars(percent_canopy_2022_raster, "./Shapefiles/percent_canopy_2022_raster.tif")
+  write_stars(avg_canopy_2022_raster, "./Shapefiles/avg_canopy_2022_raster.tif")
+  
+  
   #####  Mean Seasonal Greenness  #####
   #'  ---------------------------
   #'  Derived from MODIS Terra 16-day (2000 - 2023) data
