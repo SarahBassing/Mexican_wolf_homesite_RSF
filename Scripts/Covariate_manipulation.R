@@ -372,14 +372,20 @@
               ID = ID,
               avg_MWEPA_canopycover = avg_MWEPA_canopycover)
   
+  ref_grid <- terra::rast("./Shapefiles/WMEPA_buffer_grid_clip.tif")
+  nad83 <- crs(ref_grid)
+  
   #'  Rasterize Canopy Cover data
   #'  Use MWEPA masked grid as the template for rasterizing so the resolution, extent, and coordinate system are correct
-  percent_canopy_2022_raster <- st_rasterize(percent_canopy_2022_grid %>% template = read_stars("./Shapefiles/WMEPA_buffer_grid_clip.tif"), align = TRUE)
-  avg_canopy_2022_raster <- st_rasterize(average_canopy_2022_grid %>% template = read_stars("./Shapefiles/WMEPA_buffer_grid_clip.tif"), align = TRUE)
+  percent_canopy_2022_raster <- terra::rast(percent_canopy_2022_grid, type = "xyz", crs = nad83, digits = 6, extent = NULL)
+  avg_canopy_2022_raster <- terra::rast(average_canopy_2022_grid, type = "xyz", crs = nad83, digits = 6, extent = NULL)
+  
+  plot(percent_canopy_2022_raster[[2]])
+  plot(avg_canopy_2022_raster[[2]])
   
   #'  Save
-  write_stars(percent_canopy_2022_raster, "./Shapefiles/percent_canopy_2022_raster.tif")
-  write_stars(avg_canopy_2022_raster, "./Shapefiles/avg_canopy_2022_raster.tif")
+  writeRaster(percent_canopy_2022_raster, "./Shapefiles/percent_canopy_2022_raster.tif")
+  writeRaster(avg_canopy_2022_raster, "./Shapefiles/avg_canopy_2022_raster.tif")
   
   
   #####  Mean Seasonal Greenness  #####
@@ -459,32 +465,32 @@
   write_csv(ndvi_den, "./Data/GEE extracted data/mean_NDVI_denSeason.csv")
   write_csv(ndvi_rnd, "./Data/GEE extracted data/mean_NDVI_rndSeason.csv")
   
-  ######  2023 Rendezvous NDVI MWEPA grid  ######
-  #'  -------------------------------------
-  #'  Merge pieces of 2023 rendezvous NDVI data for entire MWEPA suitable grid
-  ndvi_grid <-list.files(path = "./Data/GEE extracted data/MWEPA suitable grid NDVI/", pattern = "\\.csv$", full.names = T) %>%
-    map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
-    dplyr::select(-c(`system:index`,`.geo`))
-  write_csv(ndvi_grid, "./Data/GEE extracted data/GEE_mean_NDVI_grid_rnd_2023.csv")
-  names(ndvi_grid) <- c("CellID", "meanNDVI", "newID")
-  
-  #'  Load reference grid & centroids
-  ref_grid <- rast("./Shapefiles/WMEPA_masked_grid.tif"); dim(ref_grid)
-  # ref_grid <- setValues(ref_grid, 1:ncell(ref_grid))
-  grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp"); crs(grid_poly)
-  
-  #'  Append NDVI to polygon sf object
-  ndvi_poly <- full_join(grid_poly, ndvi_grid, by = "CellID"); crs(ndvi_poly)
-  #'  Rename for st_rasterize
-  names(ndvi_poly) <- c("cellID", "value", "newID", "geometry")
-  
-  #'  Rasterize NDVI data
-  #'  Use MWEPA masked grid as the template for rasterizing so the resolution, extent, and coordinate system are correct
-  meanNDVI_2023rnd_raster <- st_rasterize(ndvi_poly %>% dplyr::select(value, geometry), template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), align = TRUE)
-  #'  Save
-  write_stars(meanNDVI_2023rnd_raster, "./Shapefiles/meanNDVI_2023rnd_raster2.tif")
-  
-  ndvi_raster <- rast("./Shapefiles/meanNDVI_2023rnd_raster2.tif"); res(ndvi_raster); crs(ndvi_raster)
-  plot(ndvi_raster)
+  #' ######  2023 Rendezvous NDVI MWEPA grid  ######
+  #' #'  -------------------------------------
+  #' #'  Merge pieces of 2023 rendezvous NDVI data for entire MWEPA suitable grid
+  #' ndvi_grid <-list.files(path = "./Data/GEE extracted data/MWEPA suitable grid NDVI/", pattern = "\\.csv$", full.names = T) %>%
+  #'   map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
+  #'   dplyr::select(-c(`system:index`,`.geo`))
+  #' write_csv(ndvi_grid, "./Data/GEE extracted data/GEE_mean_NDVI_grid_rnd_2023.csv")
+  #' names(ndvi_grid) <- c("CellID", "meanNDVI", "newID")
+  #' 
+  #' #'  Load reference grid & centroids
+  #' ref_grid <- rast("./Shapefiles/WMEPA_masked_grid.tif"); dim(ref_grid)
+  #' # ref_grid <- setValues(ref_grid, 1:ncell(ref_grid))
+  #' grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp"); crs(grid_poly)
+  #' 
+  #' #'  Append NDVI to polygon sf object
+  #' ndvi_poly <- full_join(grid_poly, ndvi_grid, by = "CellID"); crs(ndvi_poly)
+  #' #'  Rename for st_rasterize
+  #' names(ndvi_poly) <- c("cellID", "value", "newID", "geometry")
+  #' 
+  #' #'  Rasterize NDVI data
+  #' #'  Use MWEPA masked grid as the template for rasterizing so the resolution, extent, and coordinate system are correct
+  #' meanNDVI_2023rnd_raster <- st_rasterize(ndvi_poly %>% dplyr::select(value, geometry), template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), align = TRUE)
+  #' #'  Save
+  #' write_stars(meanNDVI_2023rnd_raster, "./Shapefiles/meanNDVI_2023rnd_raster2.tif")
+  #' 
+  #' ndvi_raster <- rast("./Shapefiles/meanNDVI_2023rnd_raster2.tif"); res(ndvi_raster); crs(ndvi_raster)
+  #' plot(ndvi_raster)
   
   
