@@ -140,7 +140,7 @@
   #'  Standardize based on mean and SD of covariates in original model
   standardize_mwepa_covs <- function(dat, mu.sd) {
     zcovs <- dat %>%
-      transmute(cellID = cellID,
+      transmute(#cellID = cellID,
                 ID = ID,
                 Elev = (Elevation_m - mu.sd$Elevation_m[1])/mu.sd$Elevation_m[2],
                 Slope = (Slope_degrees - mu.sd$Slope_degrees[1])/mu.sd$Slope_degrees[2],
@@ -155,7 +155,7 @@
                 AvgCanopyCov = (avg_MWEPA_canopycover - mu.sd$avg_MCP_canopycover[1])/mu.sd$avg_MCP_canopycover[2],
                 ModifiedCanopyCov = CanopyCov*AvgCanopyCov,
                 SeasonalNDVI = (meanNDVI - mu.sd$meanNDVI[1])/mu.sd$meanNDVI[2],
-                AvgSeasonalNDVI = (avg_MCP_meanNDVI - mu.sd$avg_MCP_meanNDVI[1])/mu.sd$avg_MCP_meanNDVI[2],
+                AvgSeasonalNDVI = (avg_MWEPA_meanNDVI - mu.sd$avg_MCP_meanNDVI[1])/mu.sd$avg_MCP_meanNDVI[2],
                 ModifiedNDVI = SeasonalNDVI * AvgSeasonalNDVI,
                 x = as.numeric(X),
                 y = as.numeric(Y))
@@ -265,11 +265,13 @@
   #' rnd_Kpredict_outliers <- lapply(rnd_Kpredict, outliers)
   
   #'  Load reference raster and identify coordinate system
-  ref_raster <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif"); res(ref_raster); crs(ref_raster)
-  grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp") # THIS TAKES AWHILE
-  # wmepa_grid_pts <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
-  nad83 <- st_crs(ref_raster)
-  # wmepa_grid_pts <- st_as_sf(wmepa_grid_pts, coords = c("X", "Y"), crs = nad83) 
+  grid_pts <- st_read("./Shapefiles/WMEPA_grid_clip_pts.shp")
+  
+  # ref_raster <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif"); res(ref_raster); crs(ref_raster)
+  # grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp") # THIS TAKES AWHILE
+  # # wmepa_grid_pts <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
+  # nad83 <- st_crs(ref_raster)
+  # # wmepa_grid_pts <- st_as_sf(wmepa_grid_pts, coords = c("X", "Y"), crs = nad83) 
   
   #'  Reclassify RSF predictions into 10 equal area bins (Boyce et al. 2002) and rasterize
   #'  Robust to extreme outlier on either end of distribution
@@ -287,18 +289,25 @@
     #'  Double check bins are of equal size
     print(table(dat$bins))
     
-    #'  Grab cellID from covs and add to dat
-    cellID <- dplyr::select(covs, c("cellID", "ID"))
-    dat <- full_join(dat, cellID, by = "ID") %>%
-      rename("CellID" = "cellID") %>%
-      mutate(bins = as.numeric(bins))
+    #' #'  Grab cellID from covs and add to dat
+    #' cellID <- dplyr::select(covs, "ID") #c("cellID", "ID")
+    #' dat <- full_join(dat, cellID, by = "ID") %>%
+    #'   rename("CellID" = "cellID") %>%
+    #'   mutate(bins = as.numeric(bins))
+    
+    #' #'  Rename grid ID
+    #' grid_pts <- rename(grid_pts, "pointid" = "ID")
     
     #'  Append data to polygon sf object
-    predict_poly <- full_join(grid_poly, dat, by = "CellID"); crs(predict_poly)
+    predict_pts <- dat %>%
+      mutate(bins = as.numeric(bins)) %>%
+      full_join(grid_pts, by = c("ID" = "pointid")) %>%
+      relocate("ID", .before = "predict_rsf") %>%
+      dplyr::select(-grid_code); crs(predict_pts)  #full_join(grid_poly, dat, by = "CellID")
     #'  Rename for st_rasterize
-    names(predict_poly) <- c("cellID", "newID", "x", "y", "predictions", "equal_area", "value", "geometry")
+    names(predict_pts) <- c("x", "y", "ID", "predictions", "equal_area", "value", "geometry") #"cellID", "newID", 
     
-    return(predict_poly)
+    return(predict_pts)
   }
   den_Kpredict_binned <- lapply(den_Kpredict, reclassify_RSF, covs = zcovs_den_mwepa)
   rnd_Kpredict_binned <- lapply(rnd_Kpredict, reclassify_RSF, covs = zcovs_rnd_mwepa)
