@@ -680,45 +680,42 @@
   #'  -----------------------------------------
   #'  Load reference grid centroids
   grid_pts <- st_read("./Shapefiles/WMEPA_grid_clip_pts.shp"); crs(grid_pts)
-  # grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp"); crs(grid_pts)
-  # grid_pts_xy <- read_csv("./Data/WMEPA_suitable_grid_points.csv")
+  xy <- st_coordinates(grid_pts)
   
-  #'  Reproject grid points
-  # grid_pts_nad83 <- st_transform(grid_pts, crs = nad83)
-  grid_pts_wgs84 <- st_transform(grid_pts, crs = wgs84)
+  #' #'  Reproject grid points
+  #' grid_pts_wgs84 <- st_transform(grid_pts, crs = wgs84)
   
-  #'  Load 2023 rendezvous season NDVI values for entire grid (extracted from GEE 
-  #'  and formatted in Covariate_manipulation.R script)
-  ndvi <- rast("./Shapefiles/Vegetation_variables/Resampled_meanNDVI_rnd_movingwindow.tif")
-  # ndvi_grid <- read_csv("./Data/GEE extracted data/GEE_mean_NDVI_grid_rnd_2023.csv")
-  # names(ndvi_grid) <- c("cellID", "meanNDVI", "ID")
-  #' #'  Find mean 2023 rendezvous NDVI value across entire grid
-  #' avg_MCP_meanNDVI <- mean(ndvi_grid$meanNDVI)
-  
-  #'  Load 2022 canopy cover values for entire grid (extracted from GEE and formatted
-  #'  in Covariate_manipulation.R script)
-  canopy_grid <- read_csv("./Data/GEE extracted data/GEE_percent_canopy_2022_grid.csv")
-  names(canopy_grid) <- c("cellID", "ID", "Mean_percent_canopy", "avg_MWEPA_canopycover")
+  #'  Load resampled covariate data
+  elev <- terra::rast("./Shapefiles/Terrain_variables/Mosaic_DEM.tif"); res(elev); crs(elev); st_bbox(elev)
+  slope <- terra::rast("./Shapefiles/Terrain_variables/slope.tif"); res(slope); crs(slope); st_bbox(slope)
+  rough <- terra::rast("./Shapefiles/Terrain_variables/VRM.tif"); res(rough); crs(rough); st_bbox(rough)
+  curve <- terra::rast("./Shapefiles/Terrain_variables/Gaussian_curvature.tif"); res(curve); crs(curve); st_bbox(curve)
+  water <- terra::rast("./Shapefiles/National Hydrography Dataset (NHD)/Resampled_Dist2Water.tif"); res(water); crs(water); st_bbox(water)
+  human_mod <- terra::rast("./Shapefiles/Human_variables/Resampled_global_Human_Modication.tif"); res(human_mod); crs(human_mod); st_bbox(human_mod)
+  roads <- terra::rast("./Shapefiles/Human_variables/Resampled_Dist2Road.tif"); res(roads); crs(roads); st_bbox(roads)
+  ndvi <- rast("./Shapefiles/Vegetation_variables/Resampled_meanNDVI_rnd_movingwindow.tif"); res(ndvi); crs(ndvi); st_bbox(ndvi)
+  canopy <- rast("./Shapefiles/Vegetation_variables/percent_canopy_2022_raster.tif"); res(canopy); crs(canopy); st_bbox(canopy)
   
   #'  Extract covariates
   terrain_stack <- c(elev, slope, rough, curve)
-  grid_terrain <- terra::extract(terrain_stack, grid_pts_nad83) 
+  grid_terrain <- terra::extract(terrain_stack, grid_pts) 
   names(grid_terrain) <- c("ID", "Elevation_m", "Slope_degrees", "Roughness_VRM", "Gaussian_curvature")
-  grid_rds <- terra::extract(roads, grid_pts_nad83) %>% rename("Nearest_road_m" = "mosaic_dist2road")
-  grid_gHM <- terra::extract(human_mod, grid_pts_nad83) %>% rename("Human_mod_index" = "mosaic_global_Human_Modification")
-  grid_h20 <- terra::extract(water, grid_pts) %>% rename("Nearest_water_m" = "Mosaic_Dist2Water")
-  grid_ndvi <- terra::extract(ndvi, grid_pts)
+  grid_rds <- terra::extract(roads, grid_pts); grid_rds <- grid_rds %>% rename("Nearest_road_m" = "Resampled_Dist2Road")
+  grid_gHM <- terra::extract(human_mod, grid_pts); grid_gHM <- grid_gHM %>% rename("Human_mod_index" = "Resampled_global_Human_Modication")
+  grid_h20 <- terra::extract(water, grid_pts); grid_h20 <- grid_h20 %>% rename("Nearest_water_m" = "Resampled_Dist2Water")
+  grid_ndvi <- terra::extract(ndvi, grid_pts) 
+  avg_MWEPA_meanNDVI <- mean(grid_ndvi$Resampled_meanNDVI_rnd_movingwindow)
+  grid_ndvi <- grid_ndvi %>% rename("meanNDVI" = "Resampled_meanNDVI_rnd_movingwindow") %>%
+    cbind(AvgSeasonalNDVI)
+  grid_canopy <- terra::extract(canopy, grid_pts)
+  
   
   #'  Combine covariates into single data frame
   grid_covs <- full_join(grid_terrain, grid_h20, by = "ID") %>%
     full_join(grid_gHM, by = "ID") %>%
     full_join(grid_rds, by = "ID") %>% 
-    full_join(ndvi_grid, by = "ID") #%>% 
-    # mutate(avg_MCP_meanNDVI = avg_MCP_meanNDVI) %>%
-    # full_join(canopy_grid, by = c("cellID", "ID")) %>% 
-    # #'  Add centroid coordinates
-    # full_join(grid_pts_xy, by = "cellID") %>%
-    # relocate(cellID, .before = ID)
+    full_join(grid_ndvi, by = "ID") %>% 
+    full_join(grid_canopy, by = "ID") 
   summary(grid_covs)
   
   #'  Save
