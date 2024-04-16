@@ -67,8 +67,8 @@
     k_folded_dat <- list(training_sets, testing_sets)
     return(k_folded_dat)
   }
-  data_den_k <- fold_in_the_cheese(all_data_den, K = 10)
-  data_rnd_k <- fold_in_the_cheese(all_data_rnd, K = 10)
+  data_den_k <- fold_in_the_cheese(all_data_den, K = 5)
+  data_rnd_k <- fold_in_the_cheese(all_data_rnd, K = 5)
   
   #'  Standardize covariates for each training data set using mean & SD of original data
   standardize_training_covs <- function(dat) {
@@ -215,7 +215,7 @@
   }
   #'  Predict relative probability of selection for den habitat across MWEPA for k training models 
   den_Kpredict <- lapply(trained_den_k_coefs, predict_den_rsf, cov = zcovs_den_mwepa)
-  head(den_Kpredict[[1]]); head(den_Kpredict[[7]])
+  head(den_Kpredict[[1]]); head(den_Kpredict[[5]])
   
   save(den_Kpredict, file = "./Outputs/kfold_predicted_den.RData")
   
@@ -234,7 +234,7 @@
   }
   #'  Predict relative probability of selection for rendezvous habitat across MWEPA for k training models 
   rnd_Kpredict <- lapply(trained_rnd_k_coefs, predict_rnd_rsf, cov = zcovs_rnd_mwepa)
-  head(rnd_Kpredict[[1]]); head(rnd_Kpredict[[10]])
+  head(rnd_Kpredict[[1]]); head(rnd_Kpredict[[5]])
   
   save(rnd_Kpredict, file = "./Outputs/kfold_predicted_rnd.RData")
   
@@ -265,7 +265,8 @@
   #' rnd_Kpredict_outliers <- lapply(rnd_Kpredict, outliers)
   
   #'  Load reference raster and identify coordinate system
-  grid_pts <- st_read("./Shapefiles/WMEPA_grid_clip_pts.shp")
+  grid_pts <- st_read("./Shapefiles/WMEPA_grid_clip_pts.shp"); crs(grid_pts)
+  xy <- st_coordinates(grid_pts)
   
   # ref_raster <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif"); res(ref_raster); crs(ref_raster)
   # grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp") # THIS TAKES AWHILE
@@ -301,11 +302,14 @@
     #'  Append data to polygon sf object
     predict_pts <- dat %>%
       mutate(bins = as.numeric(bins)) %>%
-      full_join(grid_pts, by = c("ID" = "pointid")) %>%
+      # full_join(grid_pts, by = c("ID" = "pointid")) %>%
       relocate("ID", .before = "predict_rsf") %>%
-      dplyr::select(-grid_code); crs(predict_pts)  #full_join(grid_poly, dat, by = "CellID")
+      dplyr::select(-c(x, y)) %>%
+      cbind(xy) %>%
+      relocate(X, .before = "ID") %>%
+      relocate(Y, .after = "X")
     #'  Rename for st_rasterize
-    names(predict_pts) <- c("x", "y", "ID", "predictions", "equal_area", "value", "geometry") #"cellID", "newID", 
+    names(predict_pts) <- c("x", "y", "ID", "predictions", "equal_area", "value") #"cellID", "newID", 
     
     return(predict_pts)
   }
@@ -316,26 +320,33 @@
   save(den_Kpredict_binned, file = "./Outputs/den_Kpredict_binned.RData")
   save(rnd_Kpredict_binned, file = "./Outputs/rnd_Kpredict_binned.RData")
   
+  #'  Grab the coordinate system
+  ref_grid <- terra::rast("./Shapefiles/WMEPA_buffer_grid_clip.tif")
+  nad83 <- crs(ref_grid)
+  
   #'  Function to rasterize binned data
   rasterize_rsf <- function(predicted_rast) {
     #'  Use MWEPA masked grid as the template for rasterizing so the resolution, 
     #'  extent, and coordinate system are correct
-    prediction_raster <- st_rasterize(predicted_rast %>% dplyr::select(value, geometry), 
-                                      template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), 
-                                      align = TRUE)
+    # prediction_raster <- st_rasterize(predicted_rast %>% dplyr::select(value, geometry),
+    #                                   template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"),
+    #                                   align = TRUE)
+    # predicted_rast <- dplyr::select(predicted_rast, -geometry)
+    predicted_rast <- dplyr::select(predicted_rast, c(x, y, value))
+    prediction_raster <- terra::rast(predicted_rast, type = "xyz", crs = nad83, digits = 6, extent = NULL)
     plot(prediction_raster)
     
-    #'  Convert to a terra raster object
-    prediction_raster_terra <- rast(prediction_raster)
+    #' #'  Convert to a terra raster object
+    #' prediction_raster_terra <- rast(prediction_raster)
     
-    return(prediction_raster_terra)
+    return(prediction_raster)
   }
   den_kpredict_rast <- lapply(den_Kpredict_binned, rasterize_rsf)
   rnd_kpredict_rast <- lapply(rnd_Kpredict_binned, rasterize_rsf)
   
-  #'  Save rasterized binned RSFs
-  save(den_kpredict_rast, file = "./Shapefiles/Predicted RSFs/den_Kpredict_rasters.RData")
-  save(rnd_kpredict_rast, file = "./Shapefiles/Predicted RSFs/rnd_Kpredict_rasters.RData")
+  #' #'  Save rasterized binned RSFs
+  #' save(den_kpredict_rast, file = "./Shapefiles/Predicted RSFs/den_Kpredict_rasters.RData")
+  #' save(rnd_kpredict_rast, file = "./Shapefiles/Predicted RSFs/rnd_Kpredict_rasters.RData")
   
   #'  Stack raster
   raster_stack <- function(rast_list) {
@@ -357,24 +368,24 @@
     filter(used == 1)
   
   #'  Plot smattering of predictions
-  pdf(file = "./Outputs/Figures/Kfold_RSF_predictions.pdf") 
+  pdf(file = "./Outputs/Figures/Kfold_RSF_predictions1.pdf") 
   plot(den_kfold_stack[[1]], main = "Predicted den RSF (fold1) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T)
+  plot(den_kfold_stack[[2]], main = "Predicted den RSF (fold2) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T)
   plot(den_kfold_stack[[3]], main = "Predicted den RSF (fold3) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T)
-  plot(den_kfold_stack[[5]], main = "Predicted den RSF (fold5) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T)
-  plot(den_kfold_stack[[7]], main = "Predicted den RSF (fold7) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T) 
-  plot(den_kfold_stack[[9]], main = "Predicted den RSF (fold9) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T) 
+  plot(den_kfold_stack[[4]], main = "Predicted den RSF (fold4) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T) 
+  plot(den_kfold_stack[[5]], main = "Predicted den RSF (fold5) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T) 
+  plot(rnd_kfold_stack[[1]], main = "Predicted den RSF (fold1) and all rendezvous sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(rnd_sites, pch = 16, cex = 0.5, color = "black", add = T)
   plot(rnd_kfold_stack[[2]], main = "Predicted den RSF (fold2) and all rendezvous sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(rnd_sites, pch = 16, cex = 0.5, color = "black", add = T)
+  plot(rnd_kfold_stack[[3]], main = "Predicted den RSF (fold3) and all rendezvous sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(rnd_sites, pch = 16, cex = 0.5, color = "black", add = T)
   plot(rnd_kfold_stack[[4]], main = "Predicted den RSF (fold4) and all rendezvous sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(rnd_sites, pch = 16, cex = 0.5, color = "black", add = T)
-  plot(rnd_kfold_stack[[6]], main = "Predicted den RSF (fold6) and all rendezvous sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(rnd_sites, pch = 16, cex = 0.5, color = "black", add = T)
-  plot(rnd_kfold_stack[[8]], main = "Predicted den RSF (fold8) and all rendezvous sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(rnd_sites, pch = 16, cex = 0.5, color = "black", add = T)
-  plot(rnd_kfold_stack[[10]], main = "Predicted den RSF (fold10) and all rendezvous sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(rnd_sites, pch = 16, cex = 0.5, color = "black", add = T)
+  plot(rnd_kfold_stack[[5]], main = "Predicted den RSF (fold5) and all rendezvous sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(rnd_sites, pch = 16, cex = 0.5, color = "black", add = T)
   dev.off()
   
   #'  Calculate area of each bin by summing number of pixels per bin
-  calc_bin_area <- function(binned_poly){
-    bin_area <- binned_poly %>%
+  calc_bin_area <- function(binned_rast){
+    bin_area <- binned_rast %>%
       group_by(value) %>%
-      summary(bin_area = st_area()) %>%
+      summarize(npixels = n()) %>%
       ungroup()
     return(bin_area)
   }
@@ -409,8 +420,9 @@
   #'  Extract used bins per fold and visualize output (testing_pts list & kpredict_rast 
   #'  list must be in same order so testing pts and predicted RSF are from the same fold)
   used_bins <- function(used_locs, rsf_raster) {
-    used_bins <- terra::extract(rsf_raster, used_locs) %>%
-      pivot_longer(!ID, names_to = "fold", values_to = "selection_bin")
+    used_bins <- terra::extract(rsf_raster, used_locs) 
+    names(used_bins) <- c("ID", "selection_bin")
+      # pivot_longer(!ID, names_to = "fold", values_to = "selection_bin")
     hist(na.omit(used_bins$selection_bin), main = "Frequency of used bins", xlab = "Selection bin") 
     return(used_bins)
   }
@@ -420,16 +432,16 @@
   #'  Unlist data so it's contained in one big df
   #'  Add associated fold ID to each observation
   den_usedbin_df <- bind_rows(den_usedbin, .id = "fold_ID") %>%
-    mutate(fold_ID = factor(fold_ID, levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")),
-           selection_bin = factor(selection_bin, levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"))) %>%
+    mutate(fold_ID = factor(fold_ID, levels = c("1", "2", "3", "4", "5")), #, "6", "7", "8", "9", "10"
+           selection_bin = factor(selection_bin, levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"))) %>% 
     filter(!is.na(selection_bin))
   rnd_usedbin_df <- bind_rows(rnd_usedbin, .id = "fold_ID") %>%
-    mutate(fold_ID = factor(fold_ID, levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")),
-           selection_bin = factor(selection_bin, levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"))) %>%
+    mutate(fold_ID = factor(fold_ID, levels = c("1", "2", "3", "4", "5")), #, "6", "7", "8", "9", "10"
+           selection_bin = factor(selection_bin, levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"))) %>% 
     filter(!is.na(selection_bin))
   
   #'  Create histogram of used bins
-  cols <- colorRampPalette(brewer.pal(12, "Blues"))
+  cols <- colorRampPalette(brewer.pal(5, "Blues"))
   myPal <- cols(length(unique(den_usedbin_df$fold_ID)))
   den_bin_histogram <- ggplot(den_usedbin_df, aes(selection_bin, fill = fold_ID)) + 
     geom_bar() + theme_bw() +
@@ -441,6 +453,7 @@
     # ggtitle("Selected RSF bins at den locations withheld as testing data")
   den_bin_histogram
   
+  myPal <- cols(length(unique(rnd_usedbin_df$fold_ID)))
   rnd_bin_histogram <- ggplot(rnd_usedbin_df, aes(selection_bin, fill = fold_ID)) +
     geom_bar() + theme_bw() +
     scale_x_discrete("Selection bin", drop = FALSE) +
@@ -470,26 +483,27 @@
   area_weighted_freq <- function(used_bin, bin_area) { 
     wgtBinFreq <- used_bin %>%
       #'  Count frequency of each used bin
-      group_by(layer) %>%
-      summarise(Freq = sum(layer)) %>%
+      group_by(selection_bin) %>%
+      summarise(Freq = n()) %>%
       ungroup() %>%
       #'  Drop NA's for the rare instance when a location overlaps masked pixels
-      filter(!is.na(Freq))
+      filter(!is.na(selection_bin))
     #'  Identify any missing bins (e.g., if lowest bin was never used) and IF
     #'  missing, add to data frame with frequency = 0, ELSE leave as is
-    missing <- setdiff(1:10, wgtBinFreq$layer)
+    missing <- setdiff(1:10, wgtBinFreq$selection_bin)
     if(length(missing) > 0){
       #'  Complete finishes the sequence in layer column (1:10) and fills Freq 
-      wgtBinFreq <- complete(wgtBinFreq, layer = 1:10, fill = list(Freq = 0)) 
+      wgtBinFreq <- complete(wgtBinFreq, selection_bin = 1:10, fill = list(Freq = 0)) 
     } else {
       wgtBinFreq
     }
     #'  Area-weight frequency by number of area of each bin in study area
     wgtBinFreq <- cbind(wgtBinFreq, bin_area) %>%
-      mutate(wgt_Freq = Freq/bin_area)
+      mutate(wgt_Freq = Freq/bin_area$npixels) %>%
+      dplyr::select(-value)
     #'  Calculate Spearman's Rank Correlation between bin rank and area-weighted
     #'  frequency of used locations
-    SpearmanCor <- cor(wgtBinFreq$layer, wgtBinFreq$wgt_Freq, method = "spearman")
+    SpearmanCor <- cor(wgtBinFreq$selection_bin, wgtBinFreq$wgt_Freq, method = "spearman")
     return(SpearmanCor)
   }
   
@@ -497,15 +511,15 @@
   #'  Spearman's Rank Correlation for each K-fold model
   Sp_Rank_Cor <- function(used_bin, bin_area) {
     SpRankCor <- matrix(0,3,5) 
-    for(i in 1:10){
-        usedbin <- used_bin[[i]]
-        binarea <- bin_area[[i]]
-        SpRankCor[i] <- area_weighted_freq(usedbin, binarea)
+    for(i in 1:5){
+        usedbin <- used_bin[[1]]
+        binarea <- bin_area[[1]]
+        SpRankCor[1] <- area_weighted_freq(usedbin, binarea)
         #'  Calculate mean, SD, & SE across k-folds for each year
-        SpRankCor <- as.data.frame(SpRankCor) %>%
-          mutate(mu.SpCor = rowMeans(dplyr::select(.,starts_with("V")), na.rm = TRUE),
-                 sd.SpCor = apply(dplyr::select(.,starts_with("V")), 1, sd),
-                 se.SpCor = sd.SpCor/sqrt(length(dplyr::select(.,starts_with("V")))))
+        # SpRankCor <- as.data.frame(SpRankCor) %>%
+        #   mutate(mu.SpCor = rowMeans(dplyr::select(.,starts_with("V")), na.rm = TRUE),
+        #          sd.SpCor = apply(dplyr::select(.,starts_with("V")), 1, sd),
+        #          se.SpCor = sd.SpCor/sqrt(length(dplyr::select(.,starts_with("V")))))
     }
     return(SpRankCor)
   }
