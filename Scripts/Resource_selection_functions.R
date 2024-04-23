@@ -48,7 +48,7 @@
                 CanopyCov = as.numeric(scale(Mean_percent_canopy)),
                 AvgCanopyCov = as.numeric(scale(avg_MCP_canopycover)),
                 SeasonalNDVI = as.numeric(scale(meanNDVI)),
-                AvgSeasonalNDVI = as.numeric(scale(avg_MCP_meanNDVI)))  ############ DROP ATTRIBUTES FROM SCALING
+                AvgSeasonalNDVI = as.numeric(scale(avg_MCP_meanNDVI)))  
     
     #'  Assess correlation among all scaled variables
     covs <- dat_z %>%
@@ -73,6 +73,12 @@
   summary(h1.den)
   car::vif(h1.den)
   
+  h1.den.v2 <- glm(used ~ Elev + I(Elev^2) + Slope + Rough + CanopyCov + CanopyCov:AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
+  summary(h1.den.v2)
+  
+  model.sel(h1.den, h1.den.v2)
+  #'  h1.den.v2 is 22.88 deltaAICc better than h1.den
+  
   #####  H2: physical protection and water availability  ####
   h2.den <- glm(used ~ Elev + Slope + Rough + Dist2Water + CanopyCov + CanopyCov:AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
   summary(h2.den)
@@ -81,10 +87,12 @@
   h2.den.v2 <- glm(used ~ Elev + Slope + Rough + logDist2Water + CanopyCov + CanopyCov:AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
   summary(h2.den.v2)
   
+  h2.den.v3 <- glm(used ~ Elev + I(Elev^2) + Slope + Rough + Dist2Water + CanopyCov + CanopyCov:AvgCanopyCov, data = den_dataz, weight = wgts, family = binomial) 
+  summary(h2.den.v3)
+  
   #'  Which version of the model is most supported
-  model.sel(h2.den, h2.den.v2)
-  #'  DeltaAICc 30.64 (Dist2Water model weight = 1)
-  #'  Dist2Water pval <<<0.01, logDist2Water pval <<0.01
+  model.sel(h2.den, h2.den.v2, h2.den.v3)
+  #'  h3.den.v3 is 17.41 deltaAICc better than the next best model (h2.den)
   
   #####  H3: human disturbance  #####
   h3.den <- glm(used ~ HumanMod + Dist2Road, data = den_dataz, weight = wgts, family = binomial)
@@ -113,16 +121,18 @@
                    data = den_dataz, weight = wgts, family = binomial)
   summary(h4.den.v3)
   
-  model.sel(h4.den, h4.den.v2, h4.den.v3)
-  #'  DeltaAICc h4.den and h4.den.v3 <2, h4.den.v2 delta = 40.1 from h4.den
+  h4.den.v4 <- glm(used ~ Elev + I(Elev^2) + Slope + Rough + Dist2Water + CanopyCov + CanopyCov:AvgCanopyCov + HumanMod + Dist2Road, 
+                data = den_dataz, weight = wgts, family = binomial) 
+  summary(h4.den.v4)
+  
+  model.sel(h4.den, h4.den.v2, h4.den.v3, h4.den.v4)
+  #'  h4.den.v4 is 15.52 deltaAICc better than next best (h4.den)
   
   #####  Den RSF model selection using AICc  #####
-  (den_ModSelect <- model.sel(h0.den, h1.den, h2.den, h3.den, h4.den))
-  #'  h4.den deltaAICc = 11.32 better than the next best model (h2.den)
+  (den_ModSelect <- model.sel(h0.den, h1.den.v2, h2.den.v3, h3.den.v2, h4.den.v4))
+  #'  h4.den.v4 lowest AICc, next closest model is h2.den.v3 9.59 deltaAICc away
   
-  h4.den_reduced <- glm(used ~ Elev + Slope + Rough + Dist2Water + Dist2Road, 
-  data = den_dataz, weight = wgts, family = binomial) 
-  summary(h4.den_reduced)
+  
   
   #'  ---------------------------
   ####  Rendezvous habitat RSFs  ####    
@@ -142,9 +152,10 @@
   car::vif(h2.rnd)
   h2.rnd.v2 <- glm(used ~ Elev + Rough + Curve + SeasonalNDVI + SeasonalNDVI:AvgSeasonalNDVI + logDist2Water, data = rnd_dataz, weight = wgts, family = binomial) 
   summary(h2.rnd.v2)
-  
-  model.sel(h2.rnd, h2.rnd.v2)
-  #'  DeltaAICc = 18.41 (h2.rnd model weight ~1)
+  h2.rnd.v3 <- glm(used ~ Elev + I(Elev^2) + Rough + Curve + SeasonalNDVI + SeasonalNDVI:AvgSeasonalNDVI + Dist2Water, data = rnd_dataz, weight = wgts, family = binomial) 
+  summary(h2.rnd.v3)
+  model.sel(h2.rnd, h2.rnd.v2, h2.rnd.v3)
+  #'  h2.rnd.v3 DeltaAICc = 24.88 better than h2.rnd
     
   #####  H3: human disturbance  #####
   h3.rnd <- glm(used ~ HumanMod + Dist2Road, data = rnd_dataz, weight = wgts, family = binomial)
@@ -164,19 +175,17 @@
   h4.rnd.v2 <- glm(used ~ Elev + Rough + Curve + SeasonalNDVI + SeasonalNDVI:AvgSeasonalNDVI + logDist2Water + HumanMod + logDist2Road, 
                 data = rnd_dataz, weight = wgts, family = binomial)
   summary(h4.rnd.v2)
+  h4.rnd.v3 <- glm(used ~ Elev + I(Elev^2) + Rough + Curve + SeasonalNDVI + SeasonalNDVI:AvgSeasonalNDVI + Dist2Water + HumanMod + Dist2Road, 
+                data = rnd_dataz, weight = wgts, family = binomial)
+  summary(h4.rnd.v3)
   
-  model.sel(h4.rnd, h4.rnd.v2)
-  #'  h4.rnd deltaAICc = 13.99 better than h4.rnd.v2
+  model.sel(h4.rnd, h4.rnd.v2, h4.rnd.v3)
+  #'  h4.rnd.v3 deltaAICc = 23.51 better than h4.rnd
   
   #####  Rendezvous site RSF model selection using AICc  #####
-  (rnd_ModSelect <- model.sel(h0.rnd, h1.rnd, h2.rnd, h3.rnd, h4.rnd))
-  #'  h2.rnd (model weight = 0.639) most supported, closely followed by h4.rnd 
-  #'  (<2 deltaAICc, model weight = 0.361), next best is 130 deltaAICc away.
-  #'  No difference in which covariates are significant between h2.rnd & h4.rnd
-  #'  so going to conduct k-fold cv on h2.rnd since more parsimonious model
+  (rnd_ModSelect <- model.sel(h0.rnd, h1.rnd, h2.rnd.v3, h3.rnd, h4.rnd.v3))
+  #'  h2.rnd.v3 lowest AICc, h4.rnd.v3 2.5 delta AICc away
   
-  h2.rnd_reduced <- glm(used ~ Elev + SeasonalNDVI + SeasonalNDVI:AvgSeasonalNDVI + Dist2Water, data = rnd_dataz, weight = wgts, family = binomial) 
-  summary(h2.rnd_reduced)
   
   #'  ------------------
   ####  Results tables  ####
@@ -195,6 +204,7 @@
       mutate(Parameter = row.names(.),
              Parameter = ifelse(Parameter == "(Intercept)", "Intercept", Parameter),
              Parameter = ifelse(Parameter == "Elev", "Elevation", Parameter),
+             Parameter = ifelse(Parameter == "I(Elev^2)", "Elevation^2", Parameter),
              Parameter = ifelse(Parameter == "Slope", "Slope", Parameter),
              Parameter = ifelse(Parameter == "Rough", "Roughness", Parameter),
              Parameter = ifelse(Parameter == "Curve", "Curvature", Parameter),
@@ -218,8 +228,8 @@
     return(out)
   }
   #'  Extract coefficient estimates for each trained model
-  topmod_den_coefs <- top_rsf_out(h4.den, sitetype = "Den")          
-  topmod_rnd_coefs <- top_rsf_out(h2.rnd, sitetype = "Rendezvous")   
+  topmod_den_coefs <- top_rsf_out(h4.den.v4, sitetype = "Den")          
+  topmod_rnd_coefs <- top_rsf_out(h2.rnd.v3, sitetype = "Rendezvous")   
   
   #'  Coefficient results table
   topmod_coefs <- bind_rows(topmod_den_coefs, topmod_rnd_coefs)
@@ -229,8 +239,8 @@
   
   #####  AIC model ranks  #####
   #'  Generate modelselection objects
-  den_ModSelect <- model.sel(h0.den, h1.den, h2.den, h3.den, h4.den)
-  rnd_ModSelect <- model.sel(h0.rnd, h1.rnd, h2.rnd, h3.rnd, h4.rnd)
+  den_ModSelect <- model.sel(h0.den, h1.den.v2, h2.den.v3, h3.den.v2, h4.den.v4)
+  rnd_ModSelect <- model.sel(h0.rnd, h1.rnd, h2.rnd.v3, h3.rnd, h4.rnd.v3)
   
   AIC_tbl <- function(aictable, sitetype) {
     #'  Grab relevant information from modelselection object
@@ -247,14 +257,14 @@
              #'  Rename models to something more meaningful
              Model = ifelse(Model == "h0.den", "Null", Model),
              Model = ifelse(Model == "h0.rnd", "Null", Model),
-             Model = ifelse(Model == "h1.den", "Physical protection", Model),
+             Model = ifelse(Model == "h1.den.v2", "Physical protection", Model),
              Model = ifelse(Model == "h1.rnd", "Wet meadows", Model),
-             Model = ifelse(Model == "h2.den", "Physical protection and water", Model),
-             Model = ifelse(Model == "h2.rnd", "Water availability", Model),
-             Model = ifelse(Model == "h3.den", "Human disturbance", Model),
+             Model = ifelse(Model == "h2.den.v3", "Physical protection and water", Model),
+             Model = ifelse(Model == "h2.rnd.v3", "Water availability", Model),
+             Model = ifelse(Model == "h3.den.v2", "Human disturbance", Model),
              Model = ifelse(Model == "h3.rnd", "Human disturbance", Model),
-             Model = ifelse(Model == "h4.den", "Global", Model),
-             Model = ifelse(Model == "h4.rnd", "Global", Model),
+             Model = ifelse(Model == "h4.den.v4", "Global", Model),
+             Model = ifelse(Model == "h4.rnd.v3", "Global", Model),
              #'  Round outputs to more manageable values
              AICc = round(AICc, 2),
              deltaAICc = round(deltaAICc, 2),
@@ -300,9 +310,10 @@
   #'  Standardize grid covs based on mean and SD of covariates in original model
   standardize_mwepa_covs <- function(dat, mu.sd) {
     zcovs <- dat %>%
-      transmute(cellID = cellID,
+      transmute(#cellID = cellID,
                 ID = ID,
                 Elev = (Elevation_m - mu.sd$Elevation_m[1])/mu.sd$Elevation_m[2],
+                Elev2 = (Elev ^2), # square the standardize covariate
                 Slope = (Slope_degrees - mu.sd$Slope_degrees[1])/mu.sd$Slope_degrees[2],
                 Rough = (Roughness_VRM - mu.sd$Roughness_VRM[1])/mu.sd$Roughness_VRM[2],
                 Curve = (Gaussian_curvature - mu.sd$Gaussian_curvature[1])/mu.sd$Gaussian_curvature[2],
@@ -313,7 +324,7 @@
                 AvgCanopyCov = (avg_MWEPA_canopycover - mu.sd$avg_MCP_canopycover[1])/mu.sd$avg_MCP_canopycover[2],
                 ModifiedCanopyCov = CanopyCov*AvgCanopyCov,
                 SeasonalNDVI = (meanNDVI - mu.sd$meanNDVI[1])/mu.sd$meanNDVI[2],
-                AvgSeasonalNDVI = (avg_MCP_meanNDVI - mu.sd$avg_MCP_meanNDVI[1])/mu.sd$avg_MCP_meanNDVI[2],
+                AvgSeasonalNDVI = (avg_MWEPA_meanNDVI - mu.sd$avg_MCP_meanNDVI[1])/mu.sd$avg_MCP_meanNDVI[2],
                 ModifiedNDVI = SeasonalNDVI * AvgSeasonalNDVI,
                 x = as.numeric(X),
                 y = as.numeric(Y))
@@ -330,6 +341,7 @@
       mutate(Parameter = row.names(.),
              Parameter = ifelse(Parameter == "(Intercept)", "alpha", Parameter),
              Parameter = ifelse(Parameter == "Elev", "b.elev", Parameter),
+             Parameter = ifelse(Parameter == "I(Elev^2)", "b.elev2", Parameter),
              Parameter = ifelse(Parameter == "Slope", "b.slope", Parameter),
              Parameter = ifelse(Parameter == "Rough", "b.rough", Parameter),
              Parameter = ifelse(Parameter == "Curve", "b.curve", Parameter),
@@ -347,8 +359,8 @@
     return(out)
   }
   #'  Extract coefficient estimates for each trained model
-  coefs_h4.den <- rsf_out(h4.den)   
-  coefs_h2.rnd <- rsf_out(h2.rnd)   
+  coefs_h4.den <- rsf_out(h4.den.v4)   
+  coefs_h2.rnd <- rsf_out(h2.rnd.v3)   
   
   ####  Predict across suitable habitat ####
   #'  ----------------------------------
@@ -362,11 +374,11 @@
     predict_rsf <- c()
     #'  Predict across each grid cell
     for(i in 1:nrow(cov)) {
-      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.slope*cov$Slope[i] + 
-                              coef$b.rough*cov$Rough[i] + coef$b.water*cov$Dist2Water[i] + 
-                              coef$b.canopy*cov$CanopyCov[i] + 
-                              coef$b.canopyXavgcanopy*cov$ModifiedCanopyCov[i] + 
-                              coef$b.hm*cov$HumanMod[i] + coef$b.road*cov$Dist2Road[i])}  
+      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.elev2*cov$Elev2[i] + 
+                              coef$b.slope*cov$Slope[i] + coef$b.rough*cov$Rough[i] + 
+                              coef$b.water*cov$Dist2Water[i] + coef$b.canopy*cov$CanopyCov[i] +
+                              coef$b.canopyXavgcanopy*cov$ModifiedCanopyCov[i] +
+                              coef$b.hm*cov$HumanMod[i] + coef$b.road*cov$Dist2Road[i])}
     predict_rsf <- as.data.frame(predict_rsf)
     predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
     colnames(predict_rsf) <- c("ID", "x", "y", "predict_rsf")
@@ -375,7 +387,7 @@
   }
   #'  Predict relative probability of selection for den habitat across MWEPA for k training models 
   den_h4.predict <- predict_den_rsf(coefs_h4.den, cov = zcovs_den_mwepa)
-  head(den_h4.predict); head(den_h4.predict)
+  head(den_h4.predict); tail(den_h4.predict)
   
   save(den_h4.predict, file = "./Outputs/den_h4.predict.RData")
   
@@ -383,9 +395,10 @@
     predict_rsf <- c()
     #'  Predict across each grid cell
     for(i in 1:nrow(cov)) {
-      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.rough*cov$Rough[i] + 
-                              coef$b.curve*cov$Curve[i] + coef$b.water*cov$Dist2Water[i] + 
-                              coef$b.ndvi*cov$SeasonalNDVI[i] + coef$b.ndviXavgndvi*cov$ModifiedNDVI[i])}
+      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.elev2*cov$Elev2[i] + 
+                              coef$b.rough*cov$Rough[i] + coef$b.curve*cov$Curve[i] + 
+                              coef$b.water*cov$Dist2Water[i] + coef$b.ndvi*cov$SeasonalNDVI[i] + 
+                              coef$b.ndviXavgndvi*cov$ModifiedNDVI[i])}
     predict_rsf <- as.data.frame(predict_rsf)
     predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
     colnames(predict_rsf) <- c("ID", "x", "y", "predict_rsf")
@@ -394,7 +407,7 @@
   }
   #'  Predict relative probability of selection for rendezvous habitat across MWEPA for k training models 
   rnd_h2.predict <- predict_rnd_rsf(coefs_h2.rnd, cov = zcovs_rnd_mwepa)
-  head(rnd_h2.predict); head(rnd_h2.predict)
+  head(rnd_h2.predict); tail(rnd_h2.predict)
   
   save(rnd_h2.predict, file = "./Outputs/rnd_h2.predict.RData")
   
@@ -406,9 +419,8 @@
   library(tidyterra)
   
   #'  Load reference raster and reference polygons
-  ref_raster <- terra::rast("./Shapefiles/WMEPA_masked_grid.tif"); res(ref_raster); crs(ref_raster)
-  grid_poly <- st_read("./Shapefiles/WMEPA_masked_polygon.shp") # THIS TAKES AWHILE
-  nad83 <- st_crs(ref_raster)
+  grid_pts <- st_read("./Shapefiles/WMEPA_grid_clip_pts.shp"); crs(grid_pts)
+  xy <- st_coordinates(grid_pts)
    
   #'  Reclassify RSF predictions into 10 equal area bins (Boyce et al. 2002) and rasterize
   #'  Robust to extreme outlier on either end of distribution
@@ -426,18 +438,29 @@
     #'  Double check bins are of equal size
     print(table(dat$bins))
     
-    #'  Grab cellID from covs and add to dat
-    cellID <- dplyr::select(covs, c("cellID", "ID"))
-    dat <- full_join(dat, cellID, by = "ID") %>%
-      rename("CellID" = "cellID") %>%
-      mutate(bins = as.numeric(bins))
+    #' #'  Grab cellID from covs and add to dat
+    #' cellID <- dplyr::select(covs, c("cellID", "ID"))
+    #' dat <- full_join(dat, cellID, by = "ID") %>%
+    #'   rename("CellID" = "cellID") %>%
+    #'   mutate(bins = as.numeric(bins))
+    #' 
+    #' #'  Append data to polygon sf object
+    #' predict_poly <- full_join(grid_poly, dat, by = "CellID"); crs(predict_poly)
+    #' #'  Rename for st_rasterize
+    #' names(predict_poly) <- c("cellID", "newID", "x", "y", "predictions", "equal_area", "value", "geometry")
     
     #'  Append data to polygon sf object
-    predict_poly <- full_join(grid_poly, dat, by = "CellID"); crs(predict_poly)
+    predict_pts <- dat %>%
+      mutate(bins = as.numeric(bins)) %>%
+      relocate("ID", .before = "predict_rsf") %>%
+      dplyr::select(-c(x, y)) %>%
+      cbind(xy) %>%
+      relocate(X, .before = "ID") %>%
+      relocate(Y, .after = "X")
     #'  Rename for st_rasterize
-    names(predict_poly) <- c("cellID", "newID", "x", "y", "predictions", "equal_area", "value", "geometry")
+    names(predict_pts) <- c("x", "y", "ID", "predictions", "equal_area", "value")  
     
-    return(predict_poly)
+    return(predict_pts)
   }
   den_predict_binned <- reclassify_RSF(den_h4.predict, covs = zcovs_den_mwepa)
   rnd_predict_binned <- reclassify_RSF(rnd_h2.predict, covs = zcovs_rnd_mwepa)
@@ -446,30 +469,37 @@
   save(den_predict_binned, file = "./Outputs/den_predict_binned.RData")
   save(rnd_predict_binned, file = "./Outputs/rnd_predict_binned.RData")
   
+  #'  Grab the coordinate system
+  ref_grid <- terra::rast("./Shapefiles/WMEPA_buffer_grid_clip.tif")
+  nad83 <- crs(ref_grid)
+  
   #'  Function to rasterize binned data
   rasterize_rsf <- function(predicted_rast) {
-    #'  Use MWEPA masked grid as the template for rasterizing so the resolution, 
-    #'  extent, and coordinate system are correct
-    prediction_raster <- st_rasterize(predicted_rast %>% dplyr::select(value, geometry), 
-                                      template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), 
-                                      align = TRUE)
+    #' #'  Use MWEPA masked grid as the template for rasterizing so the resolution, 
+    #' #'  extent, and coordinate system are correct
+    #' prediction_raster <- st_rasterize(predicted_rast %>% dplyr::select(value, geometry), 
+    #'                                   template = read_stars("./Shapefiles/WMEPA_masked_grid.tif"), 
+    #'                                   align = TRUE)
+    #' plot(prediction_raster)
+    #' 
+    #' #'  Convert to a terra raster object
+    #' prediction_raster_terra <- rast(prediction_raster)
+    #' names(prediction_raster_terra) <- "RSF_bin"
+    
+    predicted_rast <- dplyr::select(predicted_rast, c(x, y, value))
+    prediction_raster <- terra::rast(predicted_rast, type = "xyz", crs = nad83, digits = 6, extent = NULL)
+    names(prediction_raster) <- "RSF_bin"
     plot(prediction_raster)
     
-    #'  Convert to a terra raster object
-    prediction_raster_terra <- rast(prediction_raster)
-    names(prediction_raster_terra) <- "RSF_bin"
-    
-    return(prediction_raster_terra)
+    return(prediction_raster)
   }
   den_predict_rast <- rasterize_rsf(den_predict_binned)
   rnd_predict_rast <- rasterize_rsf(rnd_predict_binned)
   
   #'  Save rasterized binned RSFs
-  writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster.tif", overwrite = TRUE)
+  writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster_reduced.tif", overwrite = TRUE)
   writeRaster(rnd_predict_rast, filename = "./Shapefiles/Predicted RSFs/rnd_predict_raster.tif", overwrite = TRUE)
-  save(den_predict_rast, file = "./Shapefiles/Predicted RSFs/den_predict_raster.RData")
-  save(rnd_predict_rast, file = "./Shapefiles/Predicted RSFs/rnd_predict_raster.RData")
-  
+
   #'  Map predicted RSFs
   #'  Define color palette (only bins 7-10 really identifiable)
   mycolors <- c("ivory1", "beige", "lightyellow", "lemonchiffon1", "lemonchiffon2", "khaki1", "gold", "darkgoldenrod1", "darkorange", "firebrick1")
@@ -500,17 +530,7 @@
   ggsave("./Outputs/Figures/RSF_binned_rnd_plot.tiff", rnd_rsf_plot, units = "in", 
          height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
   
-  #'  Zoom in bbox
-  ggplot() +
-    geom_spatraster(data = rnd_predict_rast, aes(fill = RSF_bin)) +
-    scale_fill_gradientn(colours = mycolors, na.value = NA, 
-                         breaks = seq(0, 10, 2)) +
-    coord_sf(crs = nad83) +
-    scale_y_continuous(limits = c(33.40897, 33.52001), expand = c(0, 0)) + 
-    scale_x_continuous(limits = c(-108.90710, -108.55975), expand = c(0, 0))
-  
-    
-  
+   
   #####  Functional response to available NDVI  ####
   #'  ------------------------------------------
   #'  Create range of meanNDVI values to predict across and standardize
