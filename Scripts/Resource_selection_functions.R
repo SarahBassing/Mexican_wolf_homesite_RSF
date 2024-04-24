@@ -389,7 +389,7 @@
   den_h4.predict <- predict_den_rsf(coefs_h4.den, cov = zcovs_den_mwepa)
   head(den_h4.predict); tail(den_h4.predict)
   
-  save(den_h4.predict, file = "./Outputs/den_h4.predict.RData")
+  save(den_h4.predict, file = "./Outputs/den_h4.predict_elev2.RData")
   
   predict_rnd_rsf <- function(coef, cov) {
     predict_rsf <- c()
@@ -409,7 +409,7 @@
   rnd_h2.predict <- predict_rnd_rsf(coefs_h2.rnd, cov = zcovs_rnd_mwepa)
   head(rnd_h2.predict); tail(rnd_h2.predict)
   
-  save(rnd_h2.predict, file = "./Outputs/rnd_h2.predict.RData")
+  save(rnd_h2.predict, file = "./Outputs/rnd_h2.predict_elev2.RData")
   
   ######  Map predicted habitat selection  ######
   #'  -------------------------------------
@@ -466,8 +466,8 @@
   rnd_predict_binned <- reclassify_RSF(rnd_h2.predict, covs = zcovs_rnd_mwepa)
   
   #'  Save binned classifications per fold
-  save(den_predict_binned, file = "./Outputs/den_predict_binned.RData")
-  save(rnd_predict_binned, file = "./Outputs/rnd_predict_binned.RData")
+  save(den_predict_binned, file = "./Outputs/den_predict_binned_elev2.RData")
+  save(rnd_predict_binned, file = "./Outputs/rnd_predict_binned_elev2.RData")
   
   #'  Grab the coordinate system
   ref_grid <- terra::rast("./Shapefiles/WMEPA_buffer_grid_clip.tif")
@@ -497,8 +497,8 @@
   rnd_predict_rast <- rasterize_rsf(rnd_predict_binned)
   
   #'  Save rasterized binned RSFs
-  writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster_reduced.tif", overwrite = TRUE)
-  writeRaster(rnd_predict_rast, filename = "./Shapefiles/Predicted RSFs/rnd_predict_raster.tif", overwrite = TRUE)
+  writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster_reduced_elev2.tif", overwrite = TRUE)
+  writeRaster(rnd_predict_rast, filename = "./Shapefiles/Predicted RSFs/rnd_predict_raster_elev2.tif", overwrite = TRUE)
 
   #'  Map predicted RSFs
   #'  Define color palette (only bins 7-10 really identifiable)
