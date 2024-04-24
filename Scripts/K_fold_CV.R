@@ -100,9 +100,9 @@
   ####  Train RSFs on training data  ####
   #'  -------------------------------
   #'  Top den model
-  h4.den <- "used ~ Elev + Slope + Rough + Dist2Water + CanopyCov + CanopyCov:AvgCanopyCov + HumanMod + Dist2Road"
+  h4.den <- "used ~ Elev + I(Elev^2) + Slope + Rough + Dist2Water + CanopyCov + CanopyCov:AvgCanopyCov + HumanMod + Dist2Road"
   #'  Top rendezvous site model
-  h2.rnd <- "used ~ Elev + Rough + Curve + Dist2Water + SeasonalNDVI + SeasonalNDVI:AvgSeasonalNDVI"
+  h2.rnd <- "used ~ Elev + I(Elev^2) + Rough + Curve + Dist2Water + SeasonalNDVI + SeasonalNDVI:AvgSeasonalNDVI"
   
   #'  Refit model K-fold times
   train_rsf <- function(dat, mod) {
@@ -143,6 +143,7 @@
       transmute(#cellID = cellID,
                 ID = ID,
                 Elev = (Elevation_m - mu.sd$Elevation_m[1])/mu.sd$Elevation_m[2],
+                Elev2 = (Elev ^2), # square the standardize covariate
                 Slope = (Slope_degrees - mu.sd$Slope_degrees[1])/mu.sd$Slope_degrees[2],
                 Rough = (Roughness_VRM - mu.sd$Roughness_VRM[1])/mu.sd$Roughness_VRM[2],
                 Curve = (Gaussian_curvature - mu.sd$Gaussian_curvature[1])/mu.sd$Gaussian_curvature[2],
@@ -171,6 +172,7 @@
       mutate(Parameter = row.names(.),
              Parameter = ifelse(Parameter == "(Intercept)", "alpha", Parameter),
              Parameter = ifelse(Parameter == "Elev", "b.elev", Parameter),
+             Parameter = ifelse(Parameter == "I(Elev^2)", "b.elev2", Parameter),
              Parameter = ifelse(Parameter == "Slope", "b.slope", Parameter),
              Parameter = ifelse(Parameter == "Rough", "b.rough", Parameter),
              Parameter = ifelse(Parameter == "Curve", "b.curve", Parameter),
@@ -202,9 +204,9 @@
     predict_rsf <- c()
     #'  Predict across each grid cell
     for(i in 1:nrow(cov)) {
-      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.slope*cov$Slope[i] + 
-                              coef$b.rough*cov$Rough[i] + coef$b.water*cov$Dist2Water[i] + 
-                              coef$b.canopy*cov$CanopyCov[i] + 
+      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.elev2*cov$Elev2[i] + 
+                              coef$b.slope*cov$Slope[i] + coef$b.rough*cov$Rough[i] + 
+                              coef$b.water*cov$Dist2Water[i] + coef$b.canopy*cov$CanopyCov[i] + 
                               coef$b.canopyXavgcanopy*cov$ModifiedCanopyCov[i] + 
                               coef$b.hm*cov$HumanMod[i] + coef$b.road*cov$Dist2Road[i])}  
     predict_rsf <- as.data.frame(predict_rsf)
@@ -217,15 +219,16 @@
   den_Kpredict <- lapply(trained_den_k_coefs, predict_den_rsf, cov = zcovs_den_mwepa)
   head(den_Kpredict[[1]]); head(den_Kpredict[[5]])
   
-  save(den_Kpredict, file = "./Outputs/kfold_predicted_den.RData")
+  save(den_Kpredict, file = "./Outputs/kfold_predicted_den_elev2.RData")
   
   predict_rnd_rsf <- function(coef, cov) {
     predict_rsf <- c()
     #'  Predict across each grid cell
     for(i in 1:nrow(cov)) {
-      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.rough*cov$Rough[i] + 
-                              coef$b.curve*cov$Curve[i] + coef$b.water*cov$Dist2Water[i] + 
-                              coef$b.ndvi*cov$SeasonalNDVI[i] + coef$b.ndviXavgndvi*cov$ModifiedNDVI[i])}
+      predict_rsf[i] <- exp(coef$b.elev*cov$Elev[i] + coef$b.elev2*cov$Elev2[i] + 
+                              coef$b.rough*cov$Rough[i] + coef$b.curve*cov$Curve[i] + 
+                              coef$b.water*cov$Dist2Water[i] + coef$b.ndvi*cov$SeasonalNDVI[i] + 
+                              coef$b.ndviXavgndvi*cov$ModifiedNDVI[i])}
     predict_rsf <- as.data.frame(predict_rsf)
     predict_rsf <- cbind(cov$ID, cov$x, cov$y, predict_rsf)
     colnames(predict_rsf) <- c("ID", "x", "y", "predict_rsf")
@@ -236,7 +239,7 @@
   rnd_Kpredict <- lapply(trained_rnd_k_coefs, predict_rnd_rsf, cov = zcovs_rnd_mwepa)
   head(rnd_Kpredict[[1]]); head(rnd_Kpredict[[5]])
   
-  save(rnd_Kpredict, file = "./Outputs/kfold_predicted_rnd.RData")
+  save(rnd_Kpredict, file = "./Outputs/kfold_predicted_rnd_elev2.RData")
   
   #'  ---------------------------------------
   ####  Equal area bins for RSF predictions  ####
@@ -317,8 +320,8 @@
   rnd_Kpredict_binned <- lapply(rnd_Kpredict, reclassify_RSF, covs = zcovs_rnd_mwepa)
   
   #'  Save binned classifications per fold
-  save(den_Kpredict_binned, file = "./Outputs/den_Kpredict_binned.RData")
-  save(rnd_Kpredict_binned, file = "./Outputs/rnd_Kpredict_binned.RData")
+  save(den_Kpredict_binned, file = "./Outputs/den_Kpredict_binned_elev2.RData")
+  save(rnd_Kpredict_binned, file = "./Outputs/rnd_Kpredict_binned_elev2.RData")
   
   #'  Grab the coordinate system
   ref_grid <- terra::rast("./Shapefiles/WMEPA_buffer_grid_clip.tif")
@@ -344,10 +347,6 @@
   den_kpredict_rast <- lapply(den_Kpredict_binned, rasterize_rsf)
   rnd_kpredict_rast <- lapply(rnd_Kpredict_binned, rasterize_rsf)
   
-  #' #'  Save rasterized binned RSFs
-  #' save(den_kpredict_rast, file = "./Shapefiles/Predicted RSFs/den_Kpredict_rasters.RData")
-  #' save(rnd_kpredict_rast, file = "./Shapefiles/Predicted RSFs/rnd_Kpredict_rasters.RData")
-  
   #'  Stack raster
   raster_stack <- function(rast_list) {
     rast_stack <- rast(rast_list)
@@ -357,8 +356,8 @@
   rnd_kfold_stack <- raster_stack(rnd_kpredict_rast)
   
   #'  Save raster stack
-  writeRaster(den_kfold_stack, filename = "./Shapefiles/Predicted RSFs/den_kfold_stack.tif", overwrite = TRUE)
-  writeRaster(rnd_kfold_stack, filename = "./Shapefiles/Predicted RSFs/rnd_kfold_stack.tif", overwrite = TRUE)
+  writeRaster(den_kfold_stack, filename = "./Shapefiles/Predicted RSFs/den_kfold_stack_elev2.tif", overwrite = TRUE)
+  writeRaster(rnd_kfold_stack, filename = "./Shapefiles/Predicted RSFs/rnd_kfold_stack_elev2.tif", overwrite = TRUE)
   
   #'  Load MW Zone1 for reference
   wmz1 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_1.shp") %>% st_transform(nad83)
@@ -368,7 +367,7 @@
     filter(used == 1)
   
   #'  Plot smattering of predictions
-  pdf(file = "./Outputs/Figures/Kfold_RSF_predictions1.pdf") 
+  pdf(file = "./Outputs/Figures/Kfold_RSF_predictions_elev2.pdf") 
   plot(den_kfold_stack[[1]], main = "Predicted den RSF (fold1) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T)
   plot(den_kfold_stack[[2]], main = "Predicted den RSF (fold2) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T)
   plot(den_kfold_stack[[3]], main = "Predicted den RSF (fold3) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T)
@@ -470,11 +469,11 @@
     plot_layout(guides = "collect")
   
   #'  Save plots
-  ggsave("./Outputs/Figures/Kfold_den_selected_bins.tif", den_bin_histogram, 
+  ggsave("./Outputs/Figures/Kfold_den_selected_bins_elev2.tif", den_bin_histogram, 
          units = "in", height = 8, width = 8, dpi = 600, device = 'tiff', compression = 'lzw')
-  ggsave("./Outputs/Figures/Kfold_rnd_selected_bins.tif", rnd_bin_histogram, 
+  ggsave("./Outputs/Figures/Kfold_rnd_selected_bins_elev2.tif", rnd_bin_histogram, 
          units = "in", height = 8, width = 8, dpi = 600, device = 'tiff', compression = 'lzw')
-  ggsave("./Outputs/Figures/Kfold_selected_bins_histogram.tif", bin_histograms, 
+  ggsave("./Outputs/Figures/Kfold_selected_bins_histogram_elev2.tif", bin_histograms, 
          units = "in", height = 8, width = 16, dpi = 600, device = 'tiff', compression = 'lzw')
   
   
