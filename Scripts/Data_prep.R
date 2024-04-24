@@ -527,6 +527,14 @@
   #'  -----------------------
   #####  Explore covaraites  #####
   #'  -----------------------
+  #'  Maximum used elevations
+  max(all_data_den$Elevation_m[all_data_den$used == 1])
+  max(all_data_rnd$Elevation_m[all_data_rnd$used == 1])
+  
+  #'  Maximum available elevations
+  max(all_data_den$Elevation_m[all_data_den$used == 0])
+  max(all_data_rnd$Elevation_m[all_data_rnd$used == 0])
+  
   #'  Compare spread of covaraite values between use and available locations
   all_data_den <- mutate(all_data_den, used = ifelse(used == 0, "available", "used"))
   all_data_rnd <- mutate(all_data_rnd, used = ifelse(used == 0, "available", "used"))
@@ -722,6 +730,9 @@
   write_csv(grid_covs, "./Data/MWEPA_suitable_grid_covs.csv")
   
   
-  
+  #'  Explore elevation data - are there elevations that should be considered "unavailable"?
+  max(grid_covs$Elevation_m)
+  summary(grid_covs$Elevation_m)
+  quantile(grid_covs$Elevation_m, probs = 0.99995)
   
   
