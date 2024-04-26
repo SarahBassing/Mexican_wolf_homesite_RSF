@@ -36,8 +36,9 @@
   ####  K-fold training/testing data  ####
   #'  --------------------------------
   #'  Partition each data set into K-folds
-  fold_in_the_cheese <- function(dat, mu.sd, K) {
-    set.seed(2024)
+  fold_in_the_cheese <- function(dat, mu.sd, K, setseed) {
+    # set.seed(2024)
+    set.seed(setseed)
     #'  Use groupdata2 package with cat_col = "used" to balance folds proportional
     #'  to 0's and 1's in each data set
     fold_df <- fold(dat, k = K, cat_col = "used")
@@ -67,8 +68,8 @@
     k_folded_dat <- list(training_sets, testing_sets)
     return(k_folded_dat)
   }
-  data_den_k <- fold_in_the_cheese(all_data_den, K = 5)
-  data_rnd_k <- fold_in_the_cheese(all_data_rnd, K = 5)
+  data_den_k <- fold_in_the_cheese(all_data_den, K = 5, setseed = 2024)
+  data_rnd_k <- fold_in_the_cheese(all_data_rnd, K = 5, setseed = 2024)
   
   #'  Standardize covariates for each training data set using mean & SD of original data
   standardize_training_covs <- function(dat) {
@@ -386,6 +387,7 @@
       group_by(value) %>%
       summarize(npixels = n()) %>%
       ungroup()
+    print(bin_area)
     return(bin_area)
   }
   #'  Calculate area of each binned category for list k-fold prediction rasters
@@ -505,27 +507,34 @@
     SpearmanCor <- cor(wgtBinFreq$selection_bin, wgtBinFreq$wgt_Freq, method = "spearman")
     return(SpearmanCor)
   }
+  den_SpRankCor <- mapply(area_weighted_freq, used_bin = den_usedbin, bin_area = den_karea, SIMPLIFY = TRUE) %>%
+    as.data.frame() %>%
+    rename("rho" = ".") %>%
+    mutate(Site_type = "Den") %>%
+    relocate(Site_type, .before = "rho")
+  mean_den_SpRankCor <- den_SpRankCor %>%
+    summarise(mean_rho = mean(rho),
+           sd_rho = sd(rho), 
+           se_rho = sd_rho/sqrt(nrow(.))) %>%
+    mutate(Site_type = "Den")
+  rnd_SpRankCor <- mapply(area_weighted_freq, used_bin = rnd_usedbin, bin_area = rnd_karea, SIMPLIFY = TRUE) %>%
+    as.data.frame() %>%
+    rename("rho" = ".") %>%
+    mutate(Site_type = "Rendezvous") %>%
+    relocate(Site_type, .before = "rho")
+  mean_rnd_SpRankCor <- rnd_SpRankCor %>%
+    summarise(mean_rho = mean(rho),
+              sd_rho = sd(rho), 
+              se_rho = sd_rho/sqrt(nrow(.))) %>%
+    mutate(Site_type = "Rendezvous")
   
-  #'  Function to loop through lists of lists of used bins & bin areas to calculate
-  #'  Spearman's Rank Correlation for each K-fold model
-  Sp_Rank_Cor <- function(used_bin, bin_area) {
-    SpRankCor <- matrix(0,3,5) 
-    for(i in 1:5){
-        usedbin <- used_bin[[1]]
-        binarea <- bin_area[[1]]
-        SpRankCor[1] <- area_weighted_freq(usedbin, binarea)
-        #'  Calculate mean, SD, & SE across k-folds for each year
-        # SpRankCor <- as.data.frame(SpRankCor) %>%
-        #   mutate(mu.SpCor = rowMeans(dplyr::select(.,starts_with("V")), na.rm = TRUE),
-        #          sd.SpCor = apply(dplyr::select(.,starts_with("V")), 1, sd),
-        #          se.SpCor = sd.SpCor/sqrt(length(dplyr::select(.,starts_with("V")))))
-    }
-    return(SpRankCor)
-  }
-  #'  Run each folded dataset through Sp_Rank_Cor function, which calls the area_weighted_freq 
-  #'  function to calculate Spearman's Rank Correlation for every fold
-  den_SpRankCor <- Sp_Rank_Cor(used_bin = den_usedbin, bin_area = den_karea)
-  rnd_SpRankCor <- Sp_Rank_Cor(used_bin = rnd_usedbin, bin_area = rnd_karea)
+  #'  Create data frames of Spearman's correlation test results
+  SpRankCor_Kfold <- rbind(den_SpRankCor, rnd_SpRankCor)
+  SpRankCor_mean <- rbind(mean_den_SpRankCor, mean_rnd_SpRankCor)
+  
+  #'  Save
+  write_csv(SpRankCor_Kfold, file = "Outputs/Tables/Spearman_Rank_Corr_Kfold.csv")
+  write_csv(SpRankCor_mean, file = "Outputs/Tables/Spearman_Rank_Corr_mean.csv")
   
   #'  Try Dave's regression approach too
   #'  extract bins for used locations in each training data set and regress against 
