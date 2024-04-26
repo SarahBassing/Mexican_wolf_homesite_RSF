@@ -507,30 +507,33 @@
     SpearmanCor <- cor(wgtBinFreq$selection_bin, wgtBinFreq$wgt_Freq, method = "spearman")
     return(SpearmanCor)
   }
+  #'  Calculate and format Spearman's rank correlation coefficients per fold
   den_SpRankCor <- mapply(area_weighted_freq, used_bin = den_usedbin, bin_area = den_karea, SIMPLIFY = TRUE) %>%
     as.data.frame() %>%
     rename("rho" = ".") %>%
-    mutate(Site_type = "Den") %>%
-    relocate(Site_type, .before = "rho")
-  mean_den_SpRankCor <- den_SpRankCor %>%
-    summarise(mean_rho = mean(rho),
-           sd_rho = sd(rho), 
-           se_rho = sd_rho/sqrt(nrow(.))) %>%
-    mutate(Site_type = "Den")
+    mutate(Site_type = "Den",
+           rho = round(rho, 3)) 
   rnd_SpRankCor <- mapply(area_weighted_freq, used_bin = rnd_usedbin, bin_area = rnd_karea, SIMPLIFY = TRUE) %>%
     as.data.frame() %>%
     rename("rho" = ".") %>%
-    mutate(Site_type = "Rendezvous") %>%
-    relocate(Site_type, .before = "rho")
+    mutate(Site_type = "Rendezvous",
+           rho = round(rho, 3)) 
+  
+  #'  Calculate mean, SD, & SE across folds
+  mean_den_SpRankCor <- den_SpRankCor %>%
+    summarise(mean_rho = round(mean(rho), 3),
+              sd_rho = round(sd(rho), 3), 
+              se_rho = round(sd_rho/sqrt(nrow(.)), 3)) %>%
+    mutate(Site_type = "Den")
   mean_rnd_SpRankCor <- rnd_SpRankCor %>%
-    summarise(mean_rho = mean(rho),
-              sd_rho = sd(rho), 
-              se_rho = sd_rho/sqrt(nrow(.))) %>%
+    summarise(mean_rho = round(mean(rho), 3),
+              sd_rho = round(sd(rho), 3), 
+              se_rho = round(sd_rho/sqrt(nrow(.)), 3)) %>%
     mutate(Site_type = "Rendezvous")
   
   #'  Create data frames of Spearman's correlation test results
-  SpRankCor_Kfold <- rbind(den_SpRankCor, rnd_SpRankCor)
-  SpRankCor_mean <- rbind(mean_den_SpRankCor, mean_rnd_SpRankCor)
+  SpRankCor_Kfold <- rbind(den_SpRankCor, rnd_SpRankCor) %>% relocate(Site_type, .before = "rho")
+  SpRankCor_mean <- rbind(mean_den_SpRankCor, mean_rnd_SpRankCor) %>% relocate(Site_type, .before = "mean_rho")
   
   #'  Save
   write_csv(SpRankCor_Kfold, file = "Outputs/Tables/Spearman_Rank_Corr_Kfold.csv")
