@@ -317,6 +317,7 @@
   dim(acculoss_2022_mwepa); dim(canopy_cover_mwepa)
   
   #'  Load reference grid and extract canopy data at each point
+  #'  WMEPA_gri_clip_pts.shp was generated in ArcPro b/c R kept aggregating pixels and thus centroid points
   grid_pts <- st_read("./Shapefiles/WMEPA_grid_clip_pts.shp"); crs(grid_pts)
   xy <- st_coordinates(grid_pts)
   # grid_pts <- st_read("./Shapefiles/MWEPA_suitable_reference_grid.shp") %>%
