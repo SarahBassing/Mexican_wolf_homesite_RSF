@@ -497,7 +497,7 @@
   rnd_predict_rast <- rasterize_rsf(rnd_predict_binned)
   
   #'  Save rasterized binned RSFs
-  writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster_reduced_elev2.tif", overwrite = TRUE)
+  writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster_elev2.tif", overwrite = TRUE)
   writeRaster(rnd_predict_rast, filename = "./Shapefiles/Predicted RSFs/rnd_predict_raster_elev2.tif", overwrite = TRUE)
 
   #'  Map predicted RSFs
