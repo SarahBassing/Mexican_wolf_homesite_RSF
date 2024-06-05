@@ -150,6 +150,14 @@
   length(unique(dens$Pack))
   length(unique(rnds$Pack))
   
+  #'  Unique pack-years
+  length(unique(dens$Pack_year))
+  length(unique(rnds$Pack_year))
+  
+  #'  Unique homesites
+  nrow(dens)
+  nrow(rnds)
+  
   #'  ---------------------------------
   ##### Group and rarify repeat sites  ####
   #'  ---------------------------------
@@ -310,6 +318,10 @@
   used_homesites <- den_sample %>% bind_rows(rnd_sample)
   used_homesites_nad27 <- st_transform(used_homesites, nad27_12N)
   used_homesites_nad83 <- st_transform(used_homesites, nad83)
+  
+  #'  Final homesite count
+  nrow(used_homesites[used_homesites$Site_Type == "Den",])
+  nrow(used_homesites[used_homesites$Site_Type == "Rendezvous",])
 
   #'  --------------------------------
   ####  Generate available locations  ####
