@@ -547,6 +547,10 @@
   max(all_data_den$Elevation_m[all_data_den$used == 0])
   max(all_data_rnd$Elevation_m[all_data_rnd$used == 0])
   
+  #'  Summarize available covariate data
+  summary(all_data_den)
+  summary(all_data_rnd) 
+  
   #'  Compare spread of covaraite values between use and available locations
   all_data_den <- mutate(all_data_den, used = ifelse(used == 0, "available", "used"))
   all_data_rnd <- mutate(all_data_rnd, used = ifelse(used == 0, "available", "used"))
