@@ -6,7 +6,7 @@
   #'  -------------------
   #'  Script to run k-fold cross-validation for most supported RSFs following
   #'  methods described by Boyce et al. (2002). Script pulls in used/available 
-  #'  location data, partitions data into K fold trainign and testing data sets,
+  #'  location data, partitions data into K fold training and testing data sets,
   #'  trains models, predicts trained model results and then tests predictions
   #'  using the training data.
   #'  -------------------
@@ -441,41 +441,47 @@
            selection_bin = factor(selection_bin, levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"))) %>% 
     filter(!is.na(selection_bin))
   
+  #'  Picking colors
+  # brewer.pal(n = 9, name = "Blues")
+  # brewer.pal(n = 9, name = "GnBu")
+  # brewer.pal(n = 9, name = "BuPu")
+  # cols <- colorRampPalette(brewer.pal(5, "Blues"))
+  # myPal <- cols(length(unique(den_usedbin_df$fold_ID)))
+  # myPal <- cols(length(unique(rnd_usedbin_df$fold_ID)))
+  
   #'  Create histogram of used bins
-  cols <- colorRampPalette(brewer.pal(5, "Blues"))
-  myPal <- cols(length(unique(den_usedbin_df$fold_ID)))
   den_bin_histogram <- ggplot(den_usedbin_df, aes(selection_bin, fill = fold_ID)) + 
-    geom_bar() + theme_bw() +
+    geom_bar() + theme_bw() + theme(text = element_text(size = 16)) +
     scale_x_discrete("Selection bin", drop = FALSE) +
-    scale_fill_manual(values = myPal) + 
+    scale_fill_manual(values = c("#DEEBF7", "#9ECAE1", "#6BAED6", "#08519C", "#08306B")) + #mypal 
     ylab("Frequency of used locations") + 
     labs(fill = "Fold \nnumber") +
-    ggtitle("Den site selection bins")
+    ggtitle("Den RSF")
     # ggtitle("Selected RSF bins at den locations withheld as testing data")
   den_bin_histogram
   
-  myPal <- cols(length(unique(rnd_usedbin_df$fold_ID)))
   rnd_bin_histogram <- ggplot(rnd_usedbin_df, aes(selection_bin, fill = fold_ID)) +
-    geom_bar() + theme_bw() +
+    geom_bar() + theme_bw() + theme(text = element_text(size = 16)) +
     scale_x_discrete("Selection bin", drop = FALSE) +
-    scale_fill_manual(values = myPal) + 
+    scale_fill_manual(values = c("#DEEBF7", "#9ECAE1", "#6BAED6", "#08519C", "#08306B")) + 
     ylab("Frequency of used locations") + 
     labs(fill = "Fold \nnumber") +
-    ggtitle("Rendezvous site selection bins")
+    ggtitle("Rendezvous site RSF")
     # ggtitle("Selected RSF bins at rendezvous locations withheld as testing data")
   rnd_bin_histogram
   
   bin_histograms <- den_bin_histogram + rnd_bin_histogram +
-    plot_annotation(title = "Selected RSF bins at used sites withheld as testing data") +
+    plot_annotation(title = "RSF bins at used sites withheld as testing data",
+                    theme = theme(plot.title = element_text(size = 20))) +
     plot_annotation(tag_levels = 'a') + 
-    plot_layout(guides = "collect")
+    plot_layout(guides = "collect") 
   
   #'  Save plots
   ggsave("./Outputs/Figures/Kfold_den_selected_bins_elev2.tif", den_bin_histogram, 
          units = "in", height = 8, width = 8, dpi = 600, device = 'tiff', compression = 'lzw')
   ggsave("./Outputs/Figures/Kfold_rnd_selected_bins_elev2.tif", rnd_bin_histogram, 
          units = "in", height = 8, width = 8, dpi = 600, device = 'tiff', compression = 'lzw')
-  ggsave("./Outputs/Figures/Kfold_selected_bins_histogram_elev2.tif", bin_histograms, 
+  ggsave("./Outputs/Figures/Kfold_selected_bins_histogram_for_manuscript.tif", bin_histograms, 
          units = "in", height = 8, width = 16, dpi = 600, device = 'tiff', compression = 'lzw')
   
   
