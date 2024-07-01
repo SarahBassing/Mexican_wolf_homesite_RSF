@@ -531,6 +531,104 @@
          height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
   
    
+  #####  Non-linear response to elevation  #####
+  #'  -------------------------------------
+  #'  Create range of elevation values to predict across and standardize
+  min_elev_den <- min(all_data_den$Elevation_m); max_elev_den <- max(all_data_den$Elevation_m)
+  min_elev_rnd <- min(all_data_rnd$Elevation_m); max_elev_rnd <- max(all_data_rnd$Elevation_m)
+  range_elev_den <- seq(min_elev_den, max_elev_den, length.out = 500)
+  range_elev_rnd <- seq(min_elev_rnd, max_elev_rnd, length.out = 500)
+  zrange_elev_den <- (range_elev_den - mean(all_data_den$Elevation_m))/sd(all_data_den$Elevation_m)
+  zrange_elev_rnd <- (range_elev_rnd - mean(all_data_rnd$Elevation_m))/sd(all_data_rnd$Elevation_m)
+  #'  Merge into single data frame and square z-transformed elevation
+  elev_den_cov <- cbind(range_elev_den, zrange_elev_den) %>% as.data.frame() %>% mutate(zrange_elev2_den = zrange_elev_den^2)
+  elev_rnd_cov <- cbind(range_elev_rnd, zrange_elev_rnd) %>% as.data.frame() %>% mutate(zrange_elev2_rnd = zrange_elev_rnd^2)
+  
+  #'  Predict relative prob. of den habitat selection across available elevational gradient
+  predict_cov_effect_den <- function(coef, cov) {
+    #'  Predict across range of elevation values while holding all other covs at their mean
+    #'  (which is 0 since working with standardized covariates)
+    predict_rsf <- exp(coef$b.elev*cov$zrange_elev_den + coef$b.elev2*cov$zrange_elev2_den + 
+                         coef$b.slope*0 + coef$b.rough*0 + coef$b.water*0 + coef$b.canopy*0 +
+                         coef$b.canopyXavgcanopy*0 + coef$b.hm*0 + coef$b.road*0)
+    #'  Scale predicted rsf btween 0 and 1
+    scaled_rsf <- (predict_rsf - min(predict_rsf))/(max(predict_rsf) - min(predict_rsf))
+    #'  Create a data frame with raw elevation, standardized elevation, and predicted RSF
+    predict_rsf <- as.data.frame(predict_rsf)
+    predict_rsf <- bind_cols(cov$range_elev_den, cov$zrange_elev_den, cov$zrange_elev2_den, predict_rsf, scaled_rsf)
+    colnames(predict_rsf) <- c("Elevation", "Elevation_zscale", "Elevation_zscale_sqr", "predicted_rsf", "normalized_rsf")
+    return(predict_rsf)
+  }
+  #'  Predict relative probability of selection for rendezvous habitat across MWEPA for k training models
+  predicted_elev_effect_den <- predict_cov_effect_den(coefs_h4.den, cov = elev_den_cov) %>%
+    mutate(Site_type = "Den")
+  #'  Elevation at highest relative prob. of selection during den season
+  max(predicted_elev_effect_den$Elevation)
+  max(predicted_elev_effect_den$predicted_rsf)
+  (max_selected_elev_den <- with(predicted_elev_effect_den, Elevation[which.max(predicted_rsf)]))
+  
+  #'  NEED TO BOOTSTRAP PREDICTION INTERVAL BUT HOW....
+  # tst <- function(coef, cov) {
+  #   predict_rsf <- exp(coef$b.elev*cov$zrange_elev_den + coef$b.elev2*cov$zrange_elev2_den + 
+  #                        coef$b.slope*0 + coef$b.rough*0 + coef$b.water*0 + coef$b.canopy*0 +
+  #                        coef$b.canopyXavgcanopy*0 + coef$b.hm*0 + coef$b.road*0)
+  #   return(predict_rsf)
+  # }
+  # 
+  # library(boot)
+  # boot_fit <- boot(  
+  #   data = predict_cov_effect_den, 
+  #   statistic = tst, 
+  #   R = 100
+  # ) 
+  # tst_boot <- boot_fit(tst)
+  
+  #'  Predict relative prob. of rendezvous site habitat selection across available elevational gradient
+  predict_cov_effect_rnd <- function(coef, cov) {
+    #'  Predict across range of elevation values while holding all other covs at their mean
+    #'  (which is 0 since working with standardized covariates)
+    predict_rsf <- exp(coef$b.elev*cov$zrange_elev_rnd + coef$b.elev2*cov$zrange_elev2_rnd + 
+                         coef$b.rough*0 + coef$b.curve*0 + coef$b.water*0 +
+                         coef$b.ndvi*0 + coef$b.ndviXavgndvi*0)
+    #'  Scale predicted rsf btween 0 and 1
+    scaled_rsf <- (predict_rsf - min(predict_rsf))/(max(predict_rsf) - min(predict_rsf))
+    #'  Create a data frame with raw elevation, standardized elevation, and predicted RSF
+    predict_rsf <- as.data.frame(predict_rsf)
+    predict_rsf <- bind_cols(cov$range_elev_rnd, cov$zrange_elev_rnd, cov$zrange_elev2_rnd, predict_rsf, scaled_rsf)
+    colnames(predict_rsf) <- c("Elevation", "Elevation_zscale", "Elevation_zscale_sqr", "predicted_rsf", "normalized_rsf")
+    return(predict_rsf)
+  }
+  #'  Predict relative probability of selection for rendezvous habitat across MWEPA for k training models
+  predicted_elev_effect_rnd <- predict_cov_effect_rnd(coefs_h2.rnd, cov = elev_rnd_cov) %>%
+    mutate(Site_type = "Rendezvous site")
+  #'  Elevation at highest relative prob. of selection during den season
+  max(predicted_elev_effect_rnd$Elevation)
+  max(predicted_elev_effect_rnd$predicted_rsf)
+  (max_selected_elev_rnd <- with(predicted_elev_effect_rnd, Elevation[which.max(predicted_rsf)]))
+  
+  #'  Merge into one data set
+  predicted_elev_effect <- bind_rows(predicted_elev_effect_den, predicted_elev_effect_rnd)
+  
+  #'  Plot (NEED TO FIGURE OUT HOW TO CALCULATE PREDICTION INTERVALS)
+  elev_effect_plot <- ggplot(predicted_elev_effect, 
+                                          aes(x = Elevation, y = normalized_rsf, color = Site_type)) +
+    geom_line() +
+    #' #'  Add intervals
+    #' geom_ribbon(aes(ymin = lci, ymax = uci, color = Site_type), alpha = 0.3) +
+    geom_vline(xintercept = max_selected_elev_den, linetype = 'dashed', col = 'salmon')+
+    geom_vline(xintercept = max_selected_elev_rnd, linetype = 'dashed', col = 'darkcyan')+
+    theme_bw() +
+    theme(text = element_text(size = 16)) +
+    xlim(c(1000, max(predicted_elev_effect$Elevation))) + 
+    xlab("Elevation (m)") +
+    ylab("Relative probability of seleciton") + 
+    labs(color = "Pup-rearing site") +
+    ggtitle("Predicted effect of elevation habitat selection")
+  elev_effect_plot
+  
+  
+  
+  
   #####  Functional response to available NDVI  ####
   #'  ------------------------------------------
   #'  Create range of meanNDVI values to predict across and standardize
