@@ -84,7 +84,7 @@
   
   #'  Fit basic den model
   fit_den_rsf <- function(dat){
-    mod <- glm(used ~ Elev + Slope + logDist2Water, weight = wgts, data = dat, family = binomial)
+    mod <- glm(used ~ Elev + Slope + Dist2Water, weight = wgts, data = dat, family = binomial)
     return(mod)
   }
   den_1_2_mod <- lapply(den_1_2_ratio, fit_den_rsf); summary(den_1_2_mod[[1]]); car::vif(den_1_2_mod[[1]])
@@ -165,8 +165,8 @@
       labs(x = "Number of available locations", y = "Average coefficient estimate")
     plot(plot_slope)
     #'  Slope parameter #3
-    plot_water <- ggplot(df[df$Parameter == "logDist2Water",], aes(factor(nAvailable), y = Estimate)) +
-      geom_boxplot() + ggtitle("Log of the Distance to nearest waterbody") + theme_light() + 
+    plot_water <- ggplot(df[df$Parameter == "Dist2Water",], aes(factor(nAvailable), y = Estimate)) +
+      geom_boxplot() + ggtitle("Distance to nearest waterbody") + theme_light() + 
       labs(x = "Number of available locations", y = "Average coefficient estimate") 
     plot(plot_water)
   }
@@ -180,23 +180,48 @@
     plot(plot_intercept)
     #'  Slope parameter #1
     plot_rough <- ggplot(df[df$Parameter == "Rough",], aes(factor(nAvailable), y = Estimate)) +
-      geom_boxplot() + ggtitle("Roughness (VRM)") + theme_light() +
+      geom_boxplot() + ggtitle("Ruggedness (VRM)") + theme_light() +
       labs(x = "Number of available locations", y = "Average coefficient estimate") 
     plot(plot_rough)
-    #'  Slope parameter #2
+    #'  Slope parameter #3
     plot_curve <- ggplot(df[df$Parameter == "Curve",], aes(factor(nAvailable), y = Estimate)) +
       geom_boxplot() + ggtitle("Gaussian curvature") + theme_light() +
       labs(x = "Number of available locations", y = "Average coefficient estimate") 
     plot(plot_curve)
-    #' #'  Slope parameter #3
-    #' plot_ndvi <- ggplot(df[df$Parameter == "NDVI",], aes(factor(nAvailable), y = Estimate)) +
-    #'   geom_boxplot() + ggtitle("Mean seasonal NDVI") + theme_light() +
-    #'   labs(x = "Number of available locations", y = "Average coefficient estimate") 
-    #' plot(plot_ndvi)
   }
   rnd_coef_boxplots <- boxplot_rnd_dat(rnd_coefs)
   
+  #'  Stand along ggplots
+  plot_elev <- ggplot(den_coefs[den_coefs$Parameter == "Elev",], aes(factor(nAvailable), y = Estimate)) +
+    geom_boxplot() + ggtitle("Elevation") + theme_light() + theme(axis.title.x=element_blank()) +
+    labs(x = "Number of available locations", y = "Average coefficient estimate") 
+  plot_slope <- ggplot(den_coefs[den_coefs$Parameter == "Slope",], aes(factor(nAvailable), y = Estimate)) +
+    geom_boxplot() + ggtitle("Slope") + theme_light() + theme(axis.title.x=element_blank(), axis.title.y=element_blank()) +
+    labs(x = "Number of available locations", y = "Average coefficient estimate")
+  plot_rough <- ggplot(rnd_coefs[rnd_coefs$Parameter == "Rough",], aes(factor(nAvailable), y = Estimate)) +
+    geom_boxplot() + ggtitle("Ruggedness (VRM)") + theme_light() +
+    labs(x = "Number of available locations", y = "Average coefficient estimate") 
+  plot_curve <- ggplot(rnd_coefs[rnd_coefs$Parameter == "Curve",], aes(factor(nAvailable), y = Estimate)) +
+    geom_boxplot() + ggtitle("Gaussian curvature") + theme_light() + theme(axis.title.y=element_blank()) + 
+    labs(x = "Number of available locations", y = "Average coefficient estimate") 
   
+  
+  library(patchwork) 
+  den_sensitivity <- plot_elev + plot_slope + plot_annotation(title = "Effect of sample rate on den RSF coefficents")
+  rnd_sensitivity <- plot_rough + plot_curve + plot_annotation(title = "Effect of sample rate on rendezvous site RSF coefficients")
+  sensitivity_plots <- den_sensitivity / rnd_sensitivity + plot_annotation(tag_levels = 'a')
+  
+  #'  Alternative layout
+  thm <- theme(plot.title = element_text(face = 2, size = 16))
+  top_plot <- wrap_elements((plot_elev + plot_slope) + 
+                                   plot_annotation(title = "Effect of sample rate on den RSF coefficents", theme = thm))
+  bottom_plot <- wrap_elements(plot_rough + plot_curve + 
+                                 plot_annotation(title = "Effect of sample rate on rendezvous site RSF coefficients", theme = thm))
+  sensitivity_plots <- top_plot / bottom_plot 
+  
+  #'  Save for publication
+  ggsave("./Outputs/Figures/Sample_rate_sensitivity_plots.tiff", sensitivity_plots, 
+         units = "in", height = 7, width = 7, dpi = 600, device = 'tiff', compression = 'lzw')
   
   
   
