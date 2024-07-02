@@ -150,6 +150,14 @@
   length(unique(dens$Pack))
   length(unique(rnds$Pack))
   
+  #'  Unique pack-years
+  length(unique(dens$Pack_year))
+  length(unique(rnds$Pack_year))
+  
+  #'  Unique homesites
+  nrow(dens)
+  nrow(rnds)
+  
   #'  ---------------------------------
   ##### Group and rarify repeat sites  ####
   #'  ---------------------------------
@@ -310,6 +318,10 @@
   used_homesites <- den_sample %>% bind_rows(rnd_sample)
   used_homesites_nad27 <- st_transform(used_homesites, nad27_12N)
   used_homesites_nad83 <- st_transform(used_homesites, nad83)
+  
+  #'  Final homesite count
+  nrow(used_homesites[used_homesites$Site_Type == "Den",])
+  nrow(used_homesites[used_homesites$Site_Type == "Rendezvous",])
 
   #'  --------------------------------
   ####  Generate available locations  ####
@@ -534,6 +546,10 @@
   #'  Maximum available elevations
   max(all_data_den$Elevation_m[all_data_den$used == 0])
   max(all_data_rnd$Elevation_m[all_data_rnd$used == 0])
+  
+  #'  Summarize available covariate data
+  summary(all_data_den)
+  summary(all_data_rnd) 
   
   #'  Compare spread of covaraite values between use and available locations
   all_data_den <- mutate(all_data_den, used = ifelse(used == 0, "available", "used"))
