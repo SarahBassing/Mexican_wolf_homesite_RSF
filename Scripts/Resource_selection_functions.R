@@ -544,6 +544,7 @@
   elev_den_cov <- cbind(range_elev_den, zrange_elev_den) %>% as.data.frame() %>% mutate(zrange_elev2_den = zrange_elev_den^2)
   elev_rnd_cov <- cbind(range_elev_rnd, zrange_elev_rnd) %>% as.data.frame() %>% mutate(zrange_elev2_rnd = zrange_elev_rnd^2)
   
+  #'  DEN RSF PREDICTIONS
   #'  Predict relative prob. of den habitat selection across available elevational gradient
   predict_cov_effect_den <- function(coef, cov) {
     #'  Predict across range of elevation values while holding all other covs at their mean
@@ -566,23 +567,8 @@
   max(predicted_elev_effect_den$Elevation)
   max(predicted_elev_effect_den$predicted_rsf)
   (max_selected_elev_den <- with(predicted_elev_effect_den, Elevation[which.max(predicted_rsf)]))
-  
-  #'  NEED TO BOOTSTRAP PREDICTION INTERVAL BUT HOW....
-  # tst <- function(coef, cov) {
-  #   predict_rsf <- exp(coef$b.elev*cov$zrange_elev_den + coef$b.elev2*cov$zrange_elev2_den + 
-  #                        coef$b.slope*0 + coef$b.rough*0 + coef$b.water*0 + coef$b.canopy*0 +
-  #                        coef$b.canopyXavgcanopy*0 + coef$b.hm*0 + coef$b.road*0)
-  #   return(predict_rsf)
-  # }
-  # 
-  # library(boot)
-  # boot_fit <- boot(  
-  #   data = predict_cov_effect_den, 
-  #   statistic = tst, 
-  #   R = 100
-  # ) 
-  # tst_boot <- boot_fit(tst)
-  
+
+  #'  RENDEZVOUS SITE PREDICTIONS
   #'  Predict relative prob. of rendezvous site habitat selection across available elevational gradient
   predict_cov_effect_rnd <- function(coef, cov) {
     #'  Predict across range of elevation values while holding all other covs at their mean
@@ -609,7 +595,7 @@
   #'  Merge into one data set
   predicted_elev_effect <- bind_rows(predicted_elev_effect_den, predicted_elev_effect_rnd)
   
-  #'  Plot (NEED TO FIGURE OUT HOW TO CALCULATE PREDICTION INTERVALS)
+  #'  Visualize
   elev_effect_plot <- ggplot(predicted_elev_effect, 
                                           aes(x = Elevation, y = normalized_rsf, color = Site_type)) +
     geom_line() +
@@ -625,6 +611,73 @@
     labs(color = "Pup-rearing site") +
     ggtitle("Predicted effect of elevation habitat selection")
   elev_effect_plot
+  
+  
+  ######  BOOTSTRAP predictions  ######
+  #'  ---------------------------
+  #'  Bootstrap prediction intervals for predicted effect of elevation on relative probability of selection
+  #'  Helpful code: https://cran.r-project.org/web/packages/glm.predict/vignettes/glm.predict.html
+  #'  Number of bootstraps
+  nboot <- 100
+  
+    
+  #'  Function to bootstrap logistic regression 
+  boot <- function(x, model){
+    #'  Grab input data from model
+    data <- model.frame(model)
+    #'  Generate new data set by resampling data using same sample size as original data with replacement
+    data_sample <- data[sample(seq_len(nrow(data)), replace = TRUE), ]
+    #'  Rename the weights column so it matches original input data
+    data_sample$wgts <- data_sample$`(weights)`
+    #'  Refit model with new data set
+    coef(update(model, data = data_sample))
+  }
+  
+  #'  Den RSF
+  rsf.den <- glm(used ~ Elev + I(Elev^2) + Slope + Rough + Dist2Water + CanopyCov + CanopyCov:AvgCanopyCov + HumanMod + Dist2Road, 
+                 data = den_dataz, weight = wgts, family = binomial)
+  
+  #'  Call function nboot times and append bootstrapped coefficients into a single data frame
+  betas_boot_den <- do.call(rbind, lapply(1:nboot, boot, rsf.den))
+  
+  #'  Create new data for each covariate to predict across
+  #'  Note: holding all covs but elevation at their mean = 0 & setting intercept to 0 because only interested in linear predictors for RSF
+  x.intercept <- x.slope <- x.rough <- x.water <- x.cover <- x.hum <- x.road <- x.avgcover <- rep(0, 100)
+  #'  Creating sequence of standardized elevation values based on min and max of standardized data
+  x.elev <- seq(min(den_dataz$Elev), max(den_dataz$Elev), length.out = 100)
+  #'  Create standardized elevation^2 values based on sequence above
+  x.elev2 <- x.elev^2
+  #'  Create massive data frame of new data
+  newdat <- cbind(x.intercept, x.elev, x.elev2, x.slope, x.rough, x.water, x.cover, x.hum, x.road, x.avgcover) 
+  #'  Predict y based on the bootstrapped coefficients and new data
+  yhat <- matrix(ncol = nboot, nrow = nrow(newdat))
+  predProb <- matrix(ncol = nboot, nrow = nrow(newdat))
+  muPredProb <- c()
+  lowerp <- c()
+  upperp <- c()
+  for(i in 1:nboot){
+    dat <- as.vector(newdat[i,])
+    yhat[,i] <- betas_boot %*% dat
+    predProb[,i] <- exp(yhat[,i]) 
+    muPredProb[i] <- mean(predProb[,i])
+    lowerp[i] <- quantile(predProb[,i], probs = c(0.025))
+    upperp[i] <- quantile(predProb[,i], probs = c(0.975))
+  }
+  predicted_den_rsf_elev <- cbind(x.elev, muPredProb, lowerp, upperp) %>% as.data.frame()
+  
+  ggplot(predicted_den_rsf_elev, 
+         aes(x = x.elev, y = muPredProb)) +
+    geom_line() +
+    #'  Add intervals
+    geom_ribbon(aes(ymin = lowerp, ymax = upperp), alpha = 0.3) 
+  
+  #'  For a very specific value (highest elevation a max relative prob. of selection)
+  newdat2 <- c(0, 2.9789171, 8.87394683, 0, 0, 0, 0, 0, 0, 0)
+  yhat2 = betas_boot %*% newdat2
+  predProb2 = exp(yhat2) 
+  mean(predProb2)
+  quantile(predProb2, probs = c(0.025, 0.975))
+  
   
   
   
