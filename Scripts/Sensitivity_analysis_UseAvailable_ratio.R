@@ -207,14 +207,14 @@
   
   
   library(patchwork) 
-  den_sensitivity <- plot_elev + plot_slope + plot_annotation(title = "Effect of sample rate on den RSF coefficents")
+  den_sensitivity <- plot_elev + plot_slope + plot_annotation(title = "Effect of sample rate on den RSF coefficients")
   rnd_sensitivity <- plot_rough + plot_curve + plot_annotation(title = "Effect of sample rate on rendezvous site RSF coefficients")
   sensitivity_plots <- den_sensitivity / rnd_sensitivity + plot_annotation(tag_levels = 'a')
   
   #'  Alternative layout
   thm <- theme(plot.title = element_text(face = 2, size = 16))
   top_plot <- wrap_elements((plot_elev + plot_slope) + 
-                                   plot_annotation(title = "Effect of sample rate on den RSF coefficents", theme = thm))
+                                   plot_annotation(title = "Effect of sample rate on den RSF coefficients", theme = thm))
   bottom_plot <- wrap_elements(plot_rough + plot_curve + 
                                  plot_annotation(title = "Effect of sample rate on rendezvous site RSF coefficients", theme = thm))
   sensitivity_plots <- top_plot / bottom_plot 
