@@ -382,7 +382,16 @@
   # st_write(homesite_mcp_buff_wgs84, "./Shapefiles/Homesites/Homesite_buffered_MCP.shp")
   # st_write(homesite_mcp_buff_suitablemask, "./Shapefiles/Homesites/Homesite_buffered_MCP_suitableHabitat.shp")
   
-  #'  ------------------------------------------------
+  #'  Area of buffer (without unsuitable habitat masked out)
+  buff_area <- st_area(homesite_mcp_buff_wgs84)
+  require(units)
+  set_units(buff_area, km^2)
+  
+  #'  Area of final buffer with unsuitable habitat excluded
+  suitable_buff_area <- st_area(homesite_mcp_buff_suitablemask)
+  set_units(suitable_buff_area, km^2)
+  
+    #'  ------------------------------------------------
   #####  Generate random points within buffered area  #####
   #'  ------------------------------------------------
   #'  Number of available locations to generate per used location 
