@@ -496,6 +496,24 @@
   den_predict_rast <- rasterize_rsf(den_predict_binned)
   rnd_predict_rast <- rasterize_rsf(rnd_predict_binned)
   
+  #'  Crop raster to buffer
+  buff <- st_read("./Shapefiles/Homesites/Homesite_buffered_MCP_suitableHabitat.shp") %>%
+    st_transform(nad83)
+  plot(den_predict_rast)
+  plot(buff[1], add = T)
+  crop_rast <- crop(den_predict_rast, buff)
+  cropped_raster <- mask(crop_rast, buff)
+  plot(cropped_raster)
+  
+  #'  Calculate area of each bin
+  #'  Using full raster because this is the scale at which binning occurred 
+  #'  (slightly higher proportion of higher bins within the cropped raster based
+  #'  on how the full raster was binned and where the buffer overlays the raster)
+  bin_area <- expanse(den_predict_rast, unit="km", transform=TRUE, byValue=TRUE, wide=FALSE)
+  bin_area$percent = round(100 * bin_area$area / sum(bin_area$area), 3)
+  bin_area
+  print("Raster area"); sum(bin_area$area)
+  
   #'  Save rasterized binned RSFs
   writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster_elev2.tif", overwrite = TRUE)
   writeRaster(rnd_predict_rast, filename = "./Shapefiles/Predicted RSFs/rnd_predict_raster_elev2.tif", overwrite = TRUE)
