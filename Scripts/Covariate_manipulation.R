@@ -75,6 +75,25 @@
   app(vrm, sd)
   plot(vrm)
   
+  #'  ----------------------------
+  ####  Mosaic distance to roads  ####
+  #'  ----------------------------
+  #'  Load rasters downloaded from GEE
+  d2r.a <- terra::rast("./Shapefiles/GEE/Dist_nearest_local_4wd_rd-00000.tif"); res(d2r.a); st_crs(d2r.a)
+  d2r.b <- terra::rast("./Shapefiles/GEE/Dist_nearest_local_4wd_rd-23296.tif"); res(d2r.b); st_crs(d2r.b)
+  
+  #'  Create a spatial raster collection
+  s <- sprc(d2r.a, d2r.b)
+  
+  #'  Mosaic together into a single raster
+  d2r <- mosaic(s, filename = "./Shapefiles/Human_variables/dist_to_road_updated.tif", overwrite = TRUE)
+  
+  #'  Reproject to match DEM projection
+  dist2road <- project(d2r, crs(dem)); st_crs(dist2road)
+  plot(dist2road)
+  
+  writeRaster(dist2road, "./Shapefiles/Human_variables/dist_to_road_updated_NAD83.tif", overwrite = TRUE)
+  
   #'  -------------------------------------------------------
   ####  Martinez-Meyer et al. 2021 Habitat suitability data  ####
   #'  -------------------------------------------------------
@@ -150,25 +169,25 @@
   #'  ------------------------
   #'  Derived from Global Forest Change (2000 - 2022) data
   #'  Average 2000 canopy cover within 250 of each location (used & available)
-  mean_canopy_den <- read_csv("./Data/GEE extracted data/GEE_meanCanopyCover_2000_den.csv") %>%
+  mean_canopy_den <- read_csv("./Data/GEE extracted data/GEE_meanCanopyCover_2000_den_updated121624.csv") %>%
     dplyr::select(c(ID, Pack_year, Site_Type, mean, used)) %>%
     arrange(ID) %>%
     rename("Mean_canopy_cover_2000" = "mean")
-  mean_canopy_rnd <- read_csv("./Data/GEE extracted data/GEE_meanCanopyCover_2000_rnd.csv") %>%
+  mean_canopy_rnd <- read_csv("./Data/GEE extracted data/GEE_meanCanopyCover_2000_rnd_updated121624.csv") %>%
     dplyr::select(c(ID, Pack_year, Site_Type, mean, used)) %>%
     arrange(ID) %>%
     rename("Mean_canopy_cover_2000" = "mean")
   
   #'  Sum of area (sq. m) of canopy loss over time within 250m of each location
-  canopy_loss_den <- read_csv("./Data/GEE extracted data/GEE_accumulated_canopy_loss_area_den.csv") %>%
+  canopy_loss_den <- read_csv("./Data/GEE extracted data/GEE_accumulated_canopy_loss_area_den_updated121624.csv") %>%
     dplyr::select(c(ID, Pack_year, used, BufferArea_sq_m, CanopyLossArea_sq_m, Year_add1)) %>%
     group_by(Pack_year, Year_add1) %>%
     arrange(ID, .by_group = TRUE) %>%
     mutate(Year = Year_add1 + 2001,
            LossYear = paste0("lossYr_", Year)) %>%
     ungroup() %>%
-    dplyr::select(-Year_add1) 
-  canopy_loss_rnd <- read_csv("./Data/GEE extracted data/GEE_accumulated_canopy_loss_area_rnd.csv") %>%
+    dplyr::select(-Year_add1)
+  canopy_loss_rnd <- read_csv("./Data/GEE extracted data/GEE_accumulated_canopy_loss_area_rnd_updated121624.csv") %>%
     dplyr::select(c(ID, Pack_year, used, BufferArea_sq_m, CanopyLossArea_sq_m, Year_add1))  %>%
     group_by(Pack_year, Year_add1) %>%
     arrange(ID, .by_group = TRUE) %>%
@@ -209,7 +228,7 @@
 
   canopy_loss_rnd_reformat <- canopy_loss_rnd %>%
     #'  Each column represents area (sq. m) of canopy loss as it accumulates across years
-    pivot_wider(!Year, names_from = LossYear, values_from = CanopyLossArea_sq_m) %>%
+    pivot_wider(id_cols = !Year, names_from = LossYear, values_from = CanopyLossArea_sq_m) %>%
     #'  Join with mean canopy cover from 2000
     full_join(mean_canopy_rnd, by = c("ID", "Pack_year", "used")) %>%
     relocate(Site_Type, .after = Pack_year) %>%
@@ -293,8 +312,8 @@
     left_join(annual_cover_rnd, by = "Canopy_year")
     
   #'  Save
-  write_csv(percent_canopy_den, "./Data/GEE extracted data/percent_canopy_denSeason.csv")
-  write_csv(percent_canopy_rnd, "./Data/GEE extracted data/percent_canopy_rndSeason.csv")
+  write_csv(percent_canopy_den, "./Data/GEE extracted data/percent_canopy_denSeason_updated121624.csv")
+  write_csv(percent_canopy_rnd, "./Data/GEE extracted data/percent_canopy_rndSeason_updated121624.csv")
   
   
   ######  2022 canopy cover MWEPA grid  ######
@@ -387,7 +406,7 @@
   #'  ---------------------------
   #'  Derived from MODIS Terra 16-day (2000 - 2023) data
   #'  Load and format seasonal mean NDVI data, averaged within 250 m radius of each location
-  mean_denNDVI <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_den.csv") %>%
+  mean_denNDVI <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_den_updated121624.csv") %>% #GEE_annual_mean_NDVI_den
     dplyr::select(-`.geo`) %>%
     #'  Remove all characters after year identifier in system:index column
     mutate(Year_ID = gsub("_.*", " ", `system:index`),
@@ -405,7 +424,7 @@
     rename("meanNDVI" = "mean") %>%
     arrange(Pack_year, NDVI_year)
   
-  mean_rndNDVI <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_rnd.csv") %>%
+  mean_rndNDVI <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_rnd_updated121624.csv") %>%  #GEE_annual_mean_NDVI_rnd
     dplyr::select(-`.geo`) %>%
     #'  Remove all characters after year identifier in system:index column
     mutate(Year_ID = gsub("_.*", " ", `system:index`),
@@ -434,7 +453,7 @@
     dplyr::select(c(ID, Pack_year, used, NDVI_year, meanNDVI))
   
   #'  Format average NDVI based on what's available across entire study area
-  avg_NDVI_denSeason <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_MCPavg_den.csv") %>%
+  avg_NDVI_denSeason <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_MCP_den_updated121624.csv") %>%
     dplyr::select(-`.geo`) %>%
     #'  Remove all characters after year identifier in system:index column
     mutate(Year_ID = gsub("_.*", " ", `system:index`),
@@ -443,7 +462,7 @@
     dplyr::select(c(NDVI_year, mean)) %>%
     rename("avg_MCP_meanNDVI" = "mean")
   
-  avg_NDVI_rndSeason <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_MCPavg_rnd.csv") %>%
+  avg_NDVI_rndSeason <- read_csv("./Data/GEE extracted data/GEE_annual_mean_NDVI_MCP_rnd_updated121624.csv") %>%
     dplyr::select(-`.geo`) %>%
     #'  Remove all characters after year identifier in system:index column
     mutate(Year_ID = gsub("_.*", " ", `system:index`),
@@ -457,8 +476,8 @@
   ndvi_rnd <- left_join(NDVI_rndSeason, avg_NDVI_rndSeason, by = "NDVI_year")
   
   #'  Save
-  write_csv(ndvi_den, "./Data/GEE extracted data/mean_NDVI_denSeason.csv")
-  write_csv(ndvi_rnd, "./Data/GEE extracted data/mean_NDVI_rndSeason.csv")
+  write_csv(ndvi_den, "./Data/GEE extracted data/mean_NDVI_denSeason_updated121624.csv")
+  write_csv(ndvi_rnd, "./Data/GEE extracted data/mean_NDVI_rndSeason_updated121624.csv")
   
   #' ######  2023 Rendezvous NDVI MWEPA grid  ######
   #' #'  -------------------------------------
