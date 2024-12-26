@@ -23,8 +23,8 @@
   library(tidyverse)
   
   #'  Load used/available location data and covariates
-  all_data_den <- read_csv("./Data/all_data_den.csv")
-  all_data_rnd <- read_csv("./Data/all_data_rnd.csv")
+  all_data_den <- read_csv("./Data/all_data_den_updated121624.csv")
+  all_data_rnd <- read_csv("./Data/all_data_rnd_updated121624.csv")
   
   #'  Standardize covariate data
   ztransform <- function(dat) {
@@ -126,11 +126,11 @@
   summary(h4.den.v4)
   
   model.sel(h4.den, h4.den.v2, h4.den.v3, h4.den.v4)
-  #'  h4.den.v4 is 15.52 deltaAICc better than next best (h4.den)
+  #'  h4.den.v4 is 15.36 deltaAICc better than next best (h4.den)
   
   #####  Den RSF model selection using AICc  #####
   (den_ModSelect <- model.sel(h0.den, h1.den.v2, h2.den.v3, h3.den.v2, h4.den.v4))
-  #'  h4.den.v4 lowest AICc, next closest model is h2.den.v3 9.59 deltaAICc away
+  #'  h4.den.v4 lowest AICc, next closest model is h2.den.v3 9.78 deltaAICc away
   
   
   
@@ -180,11 +180,11 @@
   summary(h4.rnd.v3)
   
   model.sel(h4.rnd, h4.rnd.v2, h4.rnd.v3)
-  #'  h4.rnd.v3 deltaAICc = 23.51 better than h4.rnd
+  #'  h4.rnd.v3 deltaAICc = 23.45 better than h4.rnd
   
   #####  Rendezvous site RSF model selection using AICc  #####
   (rnd_ModSelect <- model.sel(h0.rnd, h1.rnd, h2.rnd.v3, h3.rnd, h4.rnd.v3))
-  #'  h2.rnd.v3 lowest AICc, h4.rnd.v3 2.5 delta AICc away
+  #'  h2.rnd.v3 lowest AICc, h4.rnd.v3 2.4 delta AICc away
   
   
   #'  ------------------
@@ -235,7 +235,7 @@
   topmod_coefs <- bind_rows(topmod_den_coefs, topmod_rnd_coefs)
   
   #'  Write file for publication
-  write_csv(topmod_coefs, file = "./Outputs/Tables/Top_Model_Coefficients.csv")
+  write_csv(topmod_coefs, file = "./Outputs/Tables/Top_Model_Coefficients_updated_121624.csv")
   
   #####  AIC model ranks  #####
   #'  Generate modelselection objects
@@ -281,7 +281,7 @@
   AIC_table <- bind_rows(AIC_table_den, AIC_table_rnd)
   
   #'  Write table for publication
-  write_csv(AIC_table, file = "./Outputs/Tables/AICc_Model_Rank_Table.csv")
+  write_csv(AIC_table, file = "./Outputs/Tables/AICc_Model_Rank_Table_updated_121624.csv")
   
   #'  ---------------------
   ####  Visualize results  ####
@@ -389,7 +389,7 @@
   den_h4.predict <- predict_den_rsf(coefs_h4.den, cov = zcovs_den_mwepa)
   head(den_h4.predict); tail(den_h4.predict)
   
-  save(den_h4.predict, file = "./Outputs/den_h4.predict_elev2.RData")
+  save(den_h4.predict, file = "./Outputs/den_h4.predict_elev2_updated_121624.RData")
   
   predict_rnd_rsf <- function(coef, cov) {
     predict_rsf <- c()
@@ -409,7 +409,7 @@
   rnd_h2.predict <- predict_rnd_rsf(coefs_h2.rnd, cov = zcovs_rnd_mwepa)
   head(rnd_h2.predict); tail(rnd_h2.predict)
   
-  save(rnd_h2.predict, file = "./Outputs/rnd_h2.predict_elev2.RData")
+  save(rnd_h2.predict, file = "./Outputs/rnd_h2.predict_elev2_updated_121624.RData")
   
   ######  Map predicted habitat selection  ######
   #'  -------------------------------------
@@ -466,8 +466,8 @@
   rnd_predict_binned <- reclassify_RSF(rnd_h2.predict, covs = zcovs_rnd_mwepa)
   
   #'  Save binned classifications per fold
-  save(den_predict_binned, file = "./Outputs/den_predict_binned_elev2.RData")
-  save(rnd_predict_binned, file = "./Outputs/rnd_predict_binned_elev2.RData")
+  save(den_predict_binned, file = "./Outputs/den_predict_binned_elev2_updated121624.RData")
+  save(rnd_predict_binned, file = "./Outputs/rnd_predict_binned_elev2_updated121624.RData")
   
   #'  Grab the coordinate system
   ref_grid <- terra::rast("./Shapefiles/WMEPA_buffer_grid_clip.tif")
@@ -515,8 +515,8 @@
   print("Raster area"); sum(bin_area$area)
   
   #'  Save rasterized binned RSFs
-  writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster_elev2.tif", overwrite = TRUE)
-  writeRaster(rnd_predict_rast, filename = "./Shapefiles/Predicted RSFs/rnd_predict_raster_elev2.tif", overwrite = TRUE)
+  writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster_elev2_updated121624.tif", overwrite = TRUE)
+  writeRaster(rnd_predict_rast, filename = "./Shapefiles/Predicted RSFs/rnd_predict_raster_elev2_updated121624.tif", overwrite = TRUE)
 
   #'  Map predicted RSFs
   #'  Define color palette (only bins 7-10 really identifiable)
@@ -543,9 +543,9 @@
     theme(text = element_text(size = 18))
   rnd_rsf_plot
   
-  ggsave("./Outputs/Figures/RSF_binned_den_plot.tiff", den_rsf_plot, units = "in", 
+  ggsave("./Outputs/Figures/RSF_binned_den_plot_updated121624.tiff", den_rsf_plot, units = "in", 
          height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
-  ggsave("./Outputs/Figures/RSF_binned_rnd_plot.tiff", rnd_rsf_plot, units = "in", 
+  ggsave("./Outputs/Figures/RSF_binned_rnd_plot_updated121624.tiff", rnd_rsf_plot, units = "in", 
          height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
   
    
