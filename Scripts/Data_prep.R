@@ -16,8 +16,11 @@
   library(readr)
   library(sf)
   library(terra)
+  library(tidyterra)
   library(spdep)
   library(adehabitatHR)
+  library(paletteer)
+  library(patchwork)
   library(tidyverse)
   #'  NOTE: dplyr arrange() orders pack names differently depending on package version. 
   #'  Use dplyr 1.1.4 for consistency
@@ -64,7 +67,7 @@
   
   #'  State, highway, and waterbody shapefiles
   usa <- st_read("./Shapefiles/tl_2012_us_state/tl_2012_us_state.shp")
-  hwys <- st_read("./Shapefiles/GEE/PrimaryRoads_AZ_NM.shp") %>% st_transform(wgs84)
+  # hwys <- st_read("./Shapefiles/GEE/PrimaryRoads_AZ_NM.shp") %>% st_transform(wgs84)
   az_nm <- filter(usa, NAME == "Arizona" | NAME == "New Mexico") %>% st_transform(wgs84) 
   crs(az_nm); st_bbox(az_nm)
   #'  Merge into single "southwest" polygon
@@ -122,8 +125,8 @@
     
   #'  Which den site falls way outside experimental population area?
   home_exp_intersection <- st_intersection(homesites_wgs84, mwepa_wgs84)
-  ggplot(mwepa_wgs84) + geom_sf() + geom_sf(data = hwys) + geom_sf(data = home_exp_intersection, aes(color = Year), shape = 16, size = 3)
-  far_away_home <- subset(homesites_wgs84, !(obs %in% home_exp_intersection$obs))
+  # ggplot(mwepa_wgs84) + geom_sf() + geom_sf(data = hwys) + geom_sf(data = home_exp_intersection, aes(color = Year), shape = 16, size = 3)
+  # far_away_home <- subset(homesites_wgs84, !(obs %in% home_exp_intersection$obs))
   #'  2023 den of the Manada del Arroyo pack
   #'  This pair was released in the state of Chihuahua, Mexico so excluding from analyses
   homesites_wgs84_usa <- filter(homesites_wgs84, Pack != "Manada del Arroyo")
@@ -552,8 +555,65 @@
   # write_csv(all_data_den, "./Data/all_data_den_1to1000ratio.csv")
   # write_csv(all_data_rnd, "./Data/all_data_rnd_1to1000ratio.csv")
   
+  #'  -----------------------------------------
+  ####  Distance btwn den and rendezvous sites ####
+  #'  -----------------------------------------
+  #'  Identify pairwise combinations of den and rendezvous sites 
+  close_sites <- function(sites) {
+    #'  Create a sequential observation for each unique site
+    pack_yr <- sites %>%
+      dplyr::select(c("Pack_year", "Pack", "Year", "Site_Type")) %>% 
+      mutate(Pack_yr_site = paste0(Pack_year, "_", Site_Type),
+             obs = seq(1:nrow(.))) %>% st_drop_geometry() 
+    print(nrow(pack_yr))
+    #'  Calculate pairwise distances between all sites
+    dist_btwn_sites <- sites$geometry %>% 
+      st_distance()
+    #'  Identify which pairings were within 1000000m of each other
+    indices <- which(dist_btwn_sites <= units::set_units(1000000, "m"), arr.ind = TRUE)
+    #'  Simplify distance matrix into a data frame where 1st column = matrix rows,
+    #'  2nd column = matrix columns, and 3rd column = distance IF < 1000000m between
+    #'  sites indexed by matrix row and column
+    indices_df <- as.data.frame(indices)
+    indices_df$dist <- as.numeric(dist_btwn_sites[indices])
+    #'  Append pack_year as two new columns corresponding to the sites indexed 
+    #'  by the matrix's "row" and "column" 
+    pairwise_distances <- full_join(indices_df, pack_yr, by = c("row" = "obs")) %>%
+      full_join(pack_yr, by = c("col" = "obs")) %>%
+      relocate(Pack_yr_site.x, .before = dist) %>%
+      relocate(Pack_yr_site.y, .before = dist) %>%
+      #'  Pull out just the pack name per site
+      mutate(pack_A = sub("\\_.*", "", Pack_yr_site.x),
+             pack_B = sub("\\_.*", "", Pack_yr_site.y),
+             pack_pair = paste0(Pack_yr_site.x, "_", Pack_yr_site.y)) %>%
+      filter(row != col) %>%
+      #'  Reduce to just pairs of den and rendezvous sites from the same pack in the same year
+      filter(Pack.x == Pack.y) %>%
+      filter(Site_Type.x != Site_Type.y) %>%
+      filter(Year.x == Year.y) %>%
+      #'  Focus on data from 2015 or later when GPS collars were used and rendezvous sites were 
+      #'  sampled more frequently
+      filter(Year.x >= 2015) %>%
+      #'  Reduce to just one observation per pair
+      distinct(dist, .keep_all = TRUE)
+    
+    #'  Report summary stats and visualize distribution of data
+    print(summary(pairwise_distances$dist))
+    boxplot(pairwise_distances$dist)
+    hist(pairwise_distances$dist)
+    
+    return(pairwise_distances)
+  }
+  close_sites_same_yr <- close_sites(homesites_wgs84_usa)
+  quantile(close_sites_same_yr$dist, 0.8)
+  (sites_within_2.5km <- length(close_sites_same_yr$dist[close_sites_same_yr$dist < 2500]))
+  (sites_within_5km <- length(close_sites_same_yr$dist[close_sites_same_yr$dist < 5000]))
+  (sites_within_100km <- length(close_sites_same_yr$dist))
+  sites_within_2.5km/sites_within_100km
+  sites_within_5km/sites_within_100km
+  
   #'  -----------------------
-  #####  Explore covaraites  #####
+  ####  Explore covaraites  ####
   #'  -----------------------
   #'  Maximum used elevations
   max(all_data_den$Elevation_m[all_data_den$used == 1])
@@ -568,10 +628,89 @@
   summary(all_data_rnd) 
   
   #'  Compare spread of covaraite values between use and available locations
-  all_data_den <- mutate(all_data_den, used = ifelse(used == 0, "available", "used"))
-  all_data_rnd <- mutate(all_data_rnd, used = ifelse(used == 0, "available", "used"))
+  all_data_den <- mutate(all_data_den, used = ifelse(used == 0, "Available", "Used")) %>%
+    mutate(used = factor(used))
+  all_data_rnd <- mutate(all_data_rnd, used = ifelse(used == 0, "Available", "Used")) %>%
+    mutate(used = factor(used))
   
-  ######  Den site histograms  ######
+  #'  ------------------------
+  #####  Visualize covariates #####
+  #'  ------------------------
+  ######  Calculate mean of each grouped covaraite  ######
+  cov_means <- function(dat) {
+    means <- dat %>% 
+      group_by(used) %>%
+      summarise(across(where(is.numeric), ~round(mean(.x), 2))) %>%
+      ungroup() %>%
+      dplyr::select(-c(ID, wgts, geometry))
+    return(means)
+  }
+  
+  ######  Density plots: usd vs available  ######
+  density_plots <- function(dat, cov, col_id, x1, x2, y1, y2, legend_title, xtitle) {
+    #'  Call cov_means function to cacluate covariate mean by group
+    means <- cov_means(dat)
+    print(means)
+    
+    #'  Create a data frame to hold relevant values and xy coordinates
+    annot <- data.frame(loc_type = c("Available", "Used"), 
+                        means = c(means[,col_id]),
+                        x = c(x1, x2),
+                        y = c(y1, y2)) %>%
+      dplyr::select(-means.geometry) 
+    names(annot) <- c("loc_type", "used", "x", "y")
+    annot <- mutate(annot, used = as.character(used))
+    
+    d_plot <- ggplot(dat, aes(x = cov, group = used, color = used, fill = used)) +
+      geom_density(alpha = 0.4, linewidth = 0.25) + theme_classic() +
+      scale_color_manual(values = c("Available" = "#6699CC", "Used" = "#993300"), 
+                         name = paste0("Sampled locations \n", legend_title, " RSF")) +
+      scale_fill_manual(values = c("Available" = "#6699CC", "Used" = "#993300"), 
+                         name = paste0("Sampled locations \n", legend_title, " RSF")) +
+      geom_text(data = annot, aes(x = x, y = y, label = paste0(loc_type, " (mean = ", used, ")"), color = loc_type), 
+                hjust = 0, size = 2, show.legend  = FALSE) + #
+      xlab(xtitle) + ylab("Density") + 
+      theme(legend.position = "none",
+            axis.line = element_line(color = 'black', linewidth = 0.2),
+            axis.ticks = element_line(colour = "black", linewidth = 0.2)) 
+    print(d_plot)
+    return(d_plot)
+  }
+  elev_den <- density_plots(all_data_den, cov = all_data_den$Elevation_m, col_id = 2, x1 = 1000, x2 = 1000, y1 = 0.00155, y2 = 0.00185, 
+                            legend_title = "Den", xtitle = "Elevation (m)")
+  elev_rnd <- density_plots(all_data_rnd, cov = all_data_rnd$Elevation_m, col_id = 2, x1 = 1000, x2 = 1500, y1 = 0.0016, y2 = 0.0025, 
+                            legend_title = "Rendezvous site", xtitle = "Elevation (m)")
+  slope_den <- density_plots(all_data_den, cov = all_data_den$Slope_degrees, col_id = 3, x1 = 5, x2 = 27, y1 = 0.08, y2 = 0.037, 
+                             legend_title = "Den", xtitle = "Slope (degrees)")
+  slope_rnd <- density_plots(all_data_rnd, cov = all_data_rnd$Slope_degrees, col_id = 3, x1 = 5, x2 = 12, y1 = 0.08, y2 = 0.055, 
+                             legend_title = "Rendezvous site", xtitle = "Slope (degrees)")
+  rough_den <- density_plots(all_data_den, cov = all_data_den$Roughness_VRM, col_id = 4, x1 = 0, x2 = 0, y1 = 2.2, y2 = 3.05, 
+                             legend_title = "Den", xtitle = "Terrain roughness (VRM)")
+  rough_rnd <- density_plots(all_data_rnd, cov = all_data_rnd$Roughness_VRM, col_id = 4, x1 = 0, x2 = 0, y1 = 2.22, y2 = 2, 
+                             legend_title = "Rendezvous site", xtitle = "Terrain roughness (VRM)")
+  curve_den <- density_plots(all_data_den, cov = all_data_den$Gaussian_curvature, col_id = 5, x1 = -0.0002, x2 = 0.00005, y1 = 150000, y2 = 20000, 
+                             legend_title = "Den", xtitle = "Surface curvature")
+  curve_rnd <- density_plots(all_data_rnd, cov = all_data_rnd$Gaussian_curvature, col_id = 5, x1 = -0.00045, x2 = 0.00005, y1 = 150000, y2 = 60000, 
+                             legend_title = "Rendezvous site", xtitle = "Surface curvature")
+  water_den <- density_plots(all_data_den, cov = all_data_den$Nearest_water_m, col_id = 6, x1 = 1500, x2 = 1500, y1 = 0.00045, y2 = 0.00052, 
+                             legend_title = "Den", xtitle = "Distance to nearest water (m)")
+  water_rnd <- density_plots(all_data_rnd, cov = all_data_rnd$Nearest_water_m, col_id = 6, x1 = 1500, x2 = 1500, y1 = 0.00047, y2 = 0.00054, 
+                             legend_title = "Rendezvous site", xtitle = "Distance to nearest water (m)")
+  human_den <- density_plots(all_data_den, cov = all_data_den$Human_mod_index, col_id = 7, x1 = 0.1, x2 = 0.1, y1 = 33, y2 = 40, 
+                             legend_title = "Den", xtitle = "Human modification index")
+  human_rnd <- density_plots(all_data_rnd, cov = all_data_rnd$Human_mod_index, col_id = 7, x1 = 0.1, x2 = 0.1, y1 = 33, y2 = 50, 
+                             legend_title = "Rendezvous site", xtitle = "Human modification index")
+  road_den <- density_plots(all_data_den, cov = all_data_den$Nearest_road_m, col_id = 8, x1 = 1300, x2 = 1700, y1 = 0.00065, y2 = 0.00045, 
+                            legend_title = "Den", xtitle = "Distance to nearest road (m)")
+  road_rnd <- density_plots(all_data_rnd, cov = all_data_rnd$Nearest_road_m, col_id = 8, x1 = 1300, x2 = 1700, y1 = 0.00065, y2 = 0.0005, 
+                            legend_title = "Rendezvous site", xtitle = "Distance to nearest road (m)")
+  canopy_den <- density_plots(all_data_den, cov = all_data_den$Mean_percent_canopy, col_id = 9, x1 = 0.05, x2 = 0.3, y1 = 6.75, y2 = 1.75, 
+                              legend_title = "Den", xtitle = "Average percent canopy cover")
+  ndvi_rnd <- density_plots(all_data_rnd, cov = all_data_rnd$meanNDVI, col_id = 11, x1 = 0.01, x2 = 0.20, y1 = 2.9, y2 = 4.9, 
+                            legend_title = "Rendezvous site", xtitle = "Average NDVI")
+  
+
+  ######  Histograms: used vs available  ######
   ggplot(all_data_den, aes(x = Elevation_m, color = used, fill = used)) + 
     geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
     labs(title = "Used vs Available Locations", x = "Elevation m", y = "Frequency") + 
@@ -579,78 +718,6 @@
     scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
     geom_vline(xintercept = mean(all_data_den$Elevation_m[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
     geom_vline(xintercept = mean(all_data_den$Elevation_m[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_den, aes(x = Slope_degrees, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Slope", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
-    geom_vline(xintercept = mean(all_data_den$Slope_degrees[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_den$Slope_degrees[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_den, aes(x = Roughness_VRM, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Roughness (VRM)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
-    geom_vline(xintercept = mean(all_data_den$Roughness_VRM[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_den$Roughness_VRM[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_den, aes(x = Gaussian_curvature, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Curvature", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
-    geom_vline(xintercept = mean(all_data_den$Gaussian_curvature[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_den$Gaussian_curvature[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_den, aes(x = Nearest_road_m, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Distance to nearest road (m)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
-    geom_vline(xintercept = mean(all_data_den$Nearest_road_m[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_den$Nearest_road_m[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_den, aes(x = log(Nearest_road_m), color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Log of distance to nearest road (m)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
-    geom_vline(xintercept = mean(log(all_data_den$Nearest_road_m[all_data_den$used == "used"])), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(log(all_data_den$Nearest_road_m[all_data_den$used == "available"])), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_den, aes(x = Human_mod_index, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Human modification", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
-    geom_vline(xintercept = mean(all_data_den$Human_mod_index[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_den$Human_mod_index[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_den, aes(x = Nearest_water_m, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Distance to nearest water (m)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
-    geom_vline(xintercept = mean(all_data_den$Nearest_water_m[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_den$Nearest_water_m[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_den, aes(x = log(Nearest_water_m), color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Log of distance to nearest water (m)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
-    geom_vline(xintercept = mean(log(all_data_den$Nearest_water_m[all_data_den$used == "used"])), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(log(all_data_den$Nearest_water_m[all_data_den$used == "available"])), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_den, aes(x = Mean_percent_canopy, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Avg. percent canopy cover (250 m radius)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
-    geom_vline(xintercept = mean(all_data_den$Mean_percent_canopy[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_den$Mean_percent_canopy[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_den, aes(x = meanNDVI, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Avg. seasonal NDVI (250 m radius)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Den \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Den \nLocations") +
-    geom_vline(xintercept = mean(all_data_den$meanNDVI[all_data_den$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_den$meanNDVI[all_data_den$used == "available"]), linetype = "dashed", color = "#7570b3")
-  
-  ######  Rendezvous site histograms  ######
   ggplot(all_data_rnd, aes(x = Elevation_m, color = used, fill = used)) + 
     geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
     labs(title = "Used vs Available Locations", x = "Elevation m", y = "Frequency") + 
@@ -658,62 +725,155 @@
     scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
     geom_vline(xintercept = mean(all_data_rnd$Elevation_m[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
     geom_vline(xintercept = mean(all_data_rnd$Elevation_m[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_rnd, aes(x = Slope_degrees, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Slope", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
-    geom_vline(xintercept = mean(all_data_rnd$Slope_degrees[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_rnd$Slope_degrees[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_rnd, aes(x = Roughness_VRM, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Roughness (VRM)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
-    geom_vline(xintercept = mean(all_data_rnd$Roughness_VRM[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_rnd$Roughness_VRM[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_rnd, aes(x = Gaussian_curvature, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Curvature", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
-    geom_vline(xintercept = mean(all_data_rnd$Gaussian_curvature[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_rnd$Gaussian_curvature[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_rnd, aes(x = log(Nearest_road_m), color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Log of distance to nearest road (m)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
-    geom_vline(xintercept = mean(log(all_data_rnd$Nearest_road_m[all_data_rnd$used == "used"])), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(log(all_data_rnd$Nearest_road_m[all_data_rnd$used == "available"])), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_rnd, aes(x = Human_mod_index, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Human modification", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
-    geom_vline(xintercept = mean(all_data_rnd$Human_mod_index[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_rnd$Human_mod_index[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_rnd, aes(x = log(Nearest_water_m), color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Log of distance to nearest water (m)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
-    geom_vline(xintercept = mean(log(all_data_rnd$Nearest_water_m[all_data_rnd$used == "used"])), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(log(all_data_rnd$Nearest_water_m[all_data_rnd$used == "available"])), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_rnd, aes(x = Mean_percent_canopy, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Avg. percent canopy cover (250 m radius)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
-    geom_vline(xintercept = mean(all_data_rnd$Mean_percent_canopy[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_rnd$Mean_percent_canopy[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
-  ggplot(all_data_rnd, aes(x = meanNDVI, color = used, fill = used)) + 
-    geom_histogram(alpha = 0.5, position = "identity", mapping = aes(y = stat(ncount))) + 
-    labs(title = "Used vs Available Locations", x = "Avg. seasonal NDVI (250 m radius)", y = "Frequency") + 
-    scale_fill_manual(values = c("available" = "#7570b3","used" = "#d95f02"), name = "Rnd \nLocations") +
-    scale_color_manual(values = c("available" = "#7570b3", "used" = "#d95f02"), name = "Rnd \nLocations") +
-    geom_vline(xintercept = mean(all_data_rnd$meanNDVI[all_data_rnd$used == "used"]), linetype = "dashed", color = "#d95f02") +
-    geom_vline(xintercept = mean(all_data_rnd$meanNDVI[all_data_rnd$used == "available"]), linetype = "dashed", color = "#7570b3")
+  
+  ######  Mapping covariates  ######
+  #'  Load boundaries
+  buff <- st_read("./Shapefiles/Homesites/Homesite_buffered_MCP_suitableHabitat.shp") %>% st_transform(nad83)
+  az_nm <- filter(usa, NAME == "Arizona" | NAME == "New Mexico") %>% st_transform(nad83) 
+  mwepa <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/MWEPA Final.shp") %>% st_transform(nad83)
+  mwz1 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_1.shp") %>% st_transform(nad83)
+  mwz2 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_2.shp") %>% st_transform(nad83)
+  mwz3 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_3.shp") %>% st_transform(nad83)
+  
+  #'  Load additional covaraite rasters
+  canopy <- rast("./Shapefiles/Vegetation_variables/percent_canopy_2022_raster.tif")
+  #'  Change NAs to 0 (represents canopy loss that year)
+  canopy_cov <- canopy[[2]]
+  canopy_cov[is.na(canopy_cov[])] <- 0
+  ndvi <- rast("./Shapefiles/Vegetation_variables/Resampled_meanNDVI_rnd_movingwindow.tif")
+  
+  #'  Visualize
+  plot(elev)
+  plot(az_nm[1], color = NA, add = T); plot(mwz3, add = T); plot(mwz2, add = T); plot(mwz1, add = T); plot(buff[1], add = T)
+  
+  #'  Crop covariates and plot
+  crop_covs <- function(cov, shp, mycolors, covname) {
+    #'  Reproject shapefile to match raster projection
+    shp_reproj <- st_transform(shp, crs(cov))
+    #'  Crop raster to shapefile
+    crop_cov <- crop(cov, shp_reproj)
+    #'  Mask raster to shapefile
+    mask_cov <- mask(crop_cov, shp_reproj)
+    #'  Plot raster
+    mapped_cov <- ggplot() +
+      geom_spatraster(data = mask_cov) +
+      geom_sf(data = shp_reproj, fill = NA) +
+      coord_sf(crs = nad83) +
+      scale_fill_gradientn(colours = mycolors, na.value = NA) +
+      labs(fill = covname) + xlab("Longitude") + ylab("Latitude") +
+      theme_bw() + 
+      theme(text = element_text(size = 12),
+            axis.text.x = element_text(angle = 45, hjust = 1),
+            axis.line = element_line(color = 'black', linewidth = 0.2),
+            axis.ticks = element_line(colour = "black", linewidth = 0.2),
+            legend.justification = c(1, 0),
+            plot.margin = unit(c(0.1,0,0,0.1), "cm"))
+    print(mapped_cov)
+    return(mapped_cov)
+  }
+  crop_elev <- crop_covs(elev, shp = buff, covname = "Elevation \n(m)", mycolors = terrain.colors(6))
+  crop_slope <- crop_covs(slope, shp = buff, covname = "Slope \n(degrees)", mycolors = terrain.colors(6))
+  crop_rough <- crop_covs(rough, shp = buff, covname = "Terrain \nroughness \n(VRM)", mycolors = terrain.colors(6))
+  crop_curve <- crop_covs(curve, shp = buff, covname = "Surface \ncurvature", mycolors = c("#26456E", "#2B5C8A", "#508BB8", "#96B7D1", "#F4F9FC", "#FFC382", "#F18932", "#CA5621", "#9E3D22", "#7B3014")) #c("darkblue", "blue", "lightblue", "red", "firebrick", "darkred")
+  crop_water <- crop_covs(water, shp = buff, covname = "Nearest \nwater (m)", mycolors = paletteer_c("ggthemes::Classic Blue", 30))
+  crop_human <- crop_covs(human_mod, shp = buff, covname = "Human \nmodification \nindex", mycolors = paletteer_c("ggthemes::Orange-Blue Diverging", 30))
+  crop_roads <- crop_covs(roads, shp = buff, covname = "Nearest \nroad (m)", mycolors = paletteer_c("ggthemes::Classic Area-Brown", 30))
+  crop_canopy <- crop_covs(canopy_cov, shp = buff, covname = "2022 Percent \ncanopy cover", mycolors = paletteer_c("grDevices::Greens", 30, direction = -1))
+  crop_ndvi <- crop_covs(ndvi, shp = buff, covname = "2022 Mean \nNDVI", mycolors = paletteer_c("ggthemes::Green-Gold", 30))
+
+  #'  Customize individual plots and patchwork together
+  elev_den <- elev_den + ggtitle("Sampled locations")
+  elev_rnd <- elev_rnd + ggtitle("Sampled locations")
+  
+  crop_elev <- crop_elev + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
+  crop_slope <- crop_slope + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
+  crop_rough <- crop_rough + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
+  crop_human <- crop_human + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
+  crop_road <- crop_roads + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
+  # crop_canopy <- crop_canopy + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
+  crop_ndvi <- crop_ndvi + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
+  
+  ######  Patchwork covariate maps & use/available data  ######
+  #'  Selection of significant covariates from top den RSF
+  top_den_covs <- (crop_elev + elev_den) / #+ plot_layout(width = c(1.5, 1)) 
+    (crop_slope + slope_den) / 
+    (crop_water + water_den) & 
+    theme(text = element_text(size = 6),
+          #'  Make legend smaller
+          legend.key.size = unit(0.5, "lines"),
+          legend.justification = c(1, 0))
+  #'  Annotate figure 
+  top_den_covs[[1]] <- top_den_covs[[1]] + plot_layout(tag_level = 'new')
+  top_den_covs[[2]] <- top_den_covs[[2]] + plot_layout(tag_level = 'new')
+  top_den_covs[[3]] <- top_den_covs[[3]] + plot_layout(tag_level = 'new')
+  top_den_covs <- top_den_covs + plot_annotation(tag_levels = c('a', '1'))
+  
+  ggsave("./Outputs/Figures/Den_top_mod_signif_covs.tiff", top_den_covs, units = "cm", 
+         height = 12, width = 12, dpi = 600, device = 'tiff', compression = 'lzw')
+  
+  #'  Additional significant covariates from top den RSF
+  top_den_covs_b <- (crop_rough + rough_den) / 
+    (crop_road + road_den) & 
+    theme(text = element_text(size = 6),
+          #'  Make legend smaller
+          legend.key.size = unit(0.5, "lines"),
+          legend.justification = c(1, 0))
+  #'  Annotate figure 
+  top_den_covs_b[[1]] <- top_den_covs_b[[1]] + plot_layout(tag_level = 'new')
+  top_den_covs_b[[2]] <- top_den_covs_b[[2]] + plot_layout(tag_level = 'new')
+  top_den_covs_b <- top_den_covs_b + plot_annotation(tag_levels = c('a', '1'))
+  
+  ggsave("./Outputs/Figures/Den_top_mod_signif_covs_secondset.tiff", top_den_covs_b, units = "cm", 
+         height = 7, width = 11, dpi = 600, device = 'tiff', compression = 'lzw')
+  
+  #'  Non-significant covariates from top den RSF
+  top_den_covs_nonsig <- (crop_human + human_den) / 
+    (crop_canopy + canopy_den) & 
+    theme(text = element_text(size = 6),
+          #'  Make legend smaller
+          legend.key.size = unit(0.5, "lines"),
+          legend.justification = c(1, 0))
+  #'  Annotate figure 
+  top_den_covs_nonsig[[1]] <- top_den_covs_nonsig[[1]] + plot_layout(tag_level = 'new')
+  top_den_covs_nonsig[[2]] <- top_den_covs_nonsig[[2]] + plot_layout(tag_level = 'new')
+  top_den_covs_nonsig <- top_den_covs_nonsig + plot_annotation(tag_levels = c('a', '1'))
+  
+  ggsave("./Outputs/Figures/Den_top_mod_nonsignif_covs.tiff", top_den_covs_nonsig, units = "cm", 
+         height = 7, width = 11, dpi = 600, device = 'tiff', compression = 'lzw')
+  
+  
+  #'  Selection of significant covariates from top rendezvous site RSF
+  top_rnd_covs <- (crop_elev + elev_rnd) / 
+    (crop_ndvi + ndvi_rnd) /
+    (crop_water + water_rnd) &
+    theme(text = element_text(size = 6),
+          #'  Make legend smaller
+          legend.key.size = unit(0.5, "lines"),
+          legend.justification = c(1, 0))
+  #'  Annotate figure 
+  top_rnd_covs[[1]] <- top_rnd_covs[[1]] + plot_layout(tag_level = 'new')
+  top_rnd_covs[[2]] <- top_rnd_covs[[2]] + plot_layout(tag_level = 'new')
+  top_rnd_covs[[3]] <- top_rnd_covs[[3]] + plot_layout(tag_level = 'new')
+  top_rnd_covs <- top_rnd_covs + plot_annotation(tag_levels = c('a', '1'))
+  
+  ggsave("./Outputs/Figures/Rendezvous_top_mod_signif_covs.tiff", top_rnd_covs, units = "cm", 
+         height = 12, width = 12, dpi = 600, device = 'tiff', compression = 'lzw')
+  
+  #'  Selection of nonsignificant covariates from top rendezvous site RSF
+  top_rnd_covs_nonsig <- (crop_rough + rough_rnd) / 
+    (crop_curve + curve_rnd) &
+    theme(text = element_text(size = 6),
+          #'  Make legend smaller
+          legend.key.size = unit(0.5, "lines"),
+          legend.justification = c(1, 0))
+  #'  Annotate figure 
+  top_rnd_covs_nonsig[[1]] <- top_rnd_covs_nonsig[[1]] + plot_layout(tag_level = 'new')
+  top_rnd_covs_nonsig[[2]] <- top_rnd_covs_nonsig[[2]] + plot_layout(tag_level = 'new')
+  top_rnd_covs_nonsig <- top_rnd_covs_nonsig + plot_annotation(tag_levels = c('a', '1'))
+  
+  ggsave("./Outputs/Figures/Rendezvous_top_mod_nonsignif_covs.tiff", top_rnd_covs_nonsig, units = "cm", 
+         height = 8, width = 12, dpi = 600, device = 'tiff', compression = 'lzw')
+  
   
   #'  -----------------------------------------
   ####  Extract covariates for reference grid  ####
