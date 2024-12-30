@@ -143,7 +143,8 @@
   curve <- terra::rast("./Shapefiles/Terrain_variables/Gaussian_curvature.tif"); res(curve); crs(curve); st_bbox(curve)
   water <- terra::rast("./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water.tif"); res(water); crs(water); st_bbox(water)
   human_mod <- terra::rast("./Shapefiles/Human_variables/mosaic_global_Human_Modification.tif"); res(human_mod); crs(human_mod); st_bbox(human_mod)
-  roads <- terra::rast("./Shapefiles/Human_variables/mosaic_dist2road.tif"); res(roads); crs(roads); st_bbox(roads)
+  # roads <- terra::rast("./Shapefiles/Human_variables/mosaic_dist2road.tif"); res(roads); crs(roads); st_bbox(roads)
+  roads <- terra::rast("./Shapefiles/Human_variables/dist_to_road_updated_NAD83.tif"); res(roads); crs(roads);st_bbox(roads)
   # ext(water) <- ext(elev)
   # ext(human_mod) <- ext(elev)
   # ext(roads) <- ext(elev)
@@ -151,7 +152,7 @@
   # dim(elev); dim(slope); dim(water); dim(human_mod); dim(roads)
   # water_resampled <- resample(water, elev, method = "bilinear", filename = "./Shapefiles/National Hydrography Dataset (NHD)/Mosaic_Dist2Water_resampled.tif")
   # human_mod_resampled <- resample(human_mod, elev)
-  # roads_resampled <- resample(roads, elev)
+  roads_resampled <- resample(roads, elev)
   # st_bbox(elev); st_bbox(slope); st_bbox(water_resampled); st_bbox(roads_resampled); st_bbox(human_mod_resampled)
   # dim(elev); dim(slope); dim(water_resampled); dim(human_mod_resampled); dim(roads_resampled)
   # 
