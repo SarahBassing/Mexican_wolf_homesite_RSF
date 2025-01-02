@@ -26,8 +26,8 @@
   library(tidyverse)
   
   #'  Load used/available location data and covariates
-  all_data_den <- read_csv("./Data/all_data_den.csv")
-  all_data_rnd <- read_csv("./Data/all_data_rnd.csv")
+  all_data_den <- read_csv("./Data/all_data_den_updated121624.csv")
+  all_data_rnd <- read_csv("./Data/all_data_rnd_updated121624.csv")
   
   #'  Load MWEPA masked grid and covariate data
   grid_covs <- read_csv("./Data/MWEPA_suitable_grid_covs.csv")
@@ -220,7 +220,7 @@
   den_Kpredict <- lapply(trained_den_k_coefs, predict_den_rsf, cov = zcovs_den_mwepa)
   head(den_Kpredict[[1]]); head(den_Kpredict[[5]])
   
-  save(den_Kpredict, file = "./Outputs/kfold_predicted_den_elev2.RData")
+  save(den_Kpredict, file = "./Outputs/kfold_predicted_den_elev2_updated121624.RData")
   
   predict_rnd_rsf <- function(coef, cov) {
     predict_rsf <- c()
@@ -240,7 +240,7 @@
   rnd_Kpredict <- lapply(trained_rnd_k_coefs, predict_rnd_rsf, cov = zcovs_rnd_mwepa)
   head(rnd_Kpredict[[1]]); head(rnd_Kpredict[[5]])
   
-  save(rnd_Kpredict, file = "./Outputs/kfold_predicted_rnd_elev2.RData")
+  save(rnd_Kpredict, file = "./Outputs/kfold_predicted_rnd_elev2_updated121624.RData")
   
   #'  ---------------------------------------
   ####  Equal area bins for RSF predictions  ####
@@ -321,8 +321,8 @@
   rnd_Kpredict_binned <- lapply(rnd_Kpredict, reclassify_RSF, covs = zcovs_rnd_mwepa)
   
   #'  Save binned classifications per fold
-  save(den_Kpredict_binned, file = "./Outputs/den_Kpredict_binned_elev2.RData")
-  save(rnd_Kpredict_binned, file = "./Outputs/rnd_Kpredict_binned_elev2.RData")
+  save(den_Kpredict_binned, file = "./Outputs/den_Kpredict_binned_elev2_updated121624.RData")
+  save(rnd_Kpredict_binned, file = "./Outputs/rnd_Kpredict_binned_elev2_updated121624.RData")
   
   #'  Grab the coordinate system
   ref_grid <- terra::rast("./Shapefiles/WMEPA_buffer_grid_clip.tif")
@@ -357,8 +357,8 @@
   rnd_kfold_stack <- raster_stack(rnd_kpredict_rast)
   
   #'  Save raster stack
-  writeRaster(den_kfold_stack, filename = "./Shapefiles/Predicted RSFs/den_kfold_stack_elev2.tif", overwrite = TRUE)
-  writeRaster(rnd_kfold_stack, filename = "./Shapefiles/Predicted RSFs/rnd_kfold_stack_elev2.tif", overwrite = TRUE)
+  writeRaster(den_kfold_stack, filename = "./Shapefiles/Predicted RSFs/den_kfold_stack_elev2_updated121624.tif", overwrite = TRUE)
+  writeRaster(rnd_kfold_stack, filename = "./Shapefiles/Predicted RSFs/rnd_kfold_stack_elev2_updated121624.tif", overwrite = TRUE)
   
   #'  Load MW Zone1 for reference
   wmz1 <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/Final_MWEPA_Zone_1.shp") %>% st_transform(nad83)
@@ -368,7 +368,7 @@
     filter(used == 1)
   
   #'  Plot smattering of predictions
-  pdf(file = "./Outputs/Figures/Kfold_RSF_predictions_elev2.pdf") 
+  pdf(file = "./Outputs/Figures/Kfold_RSF_predictions_elev2_updated121624.pdf") 
   plot(den_kfold_stack[[1]], main = "Predicted den RSF (fold1) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T)
   plot(den_kfold_stack[[2]], main = "Predicted den RSF (fold2) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T)
   plot(den_kfold_stack[[3]], main = "Predicted den RSF (fold3) and all den sites"); plot(wmz1, fill = NULL, color = "black", add = T); plot(den_sites, pch = 16, cex = 0.5, color = "black", add = T)
@@ -477,11 +477,11 @@
     plot_layout(guides = "collect") 
   
   #'  Save plots
-  ggsave("./Outputs/Figures/Kfold_den_selected_bins_elev2.tif", den_bin_histogram, 
+  ggsave("./Outputs/Figures/Kfold_den_selected_bins_elev2_updated121624.tif", den_bin_histogram, 
          units = "in", height = 8, width = 8, dpi = 600, device = 'tiff', compression = 'lzw')
-  ggsave("./Outputs/Figures/Kfold_rnd_selected_bins_elev2.tif", rnd_bin_histogram, 
+  ggsave("./Outputs/Figures/Kfold_rnd_selected_bins_elev2_updated121624.tif", rnd_bin_histogram, 
          units = "in", height = 8, width = 8, dpi = 600, device = 'tiff', compression = 'lzw')
-  ggsave("./Outputs/Figures/Kfold_selected_bins_histogram_for_manuscript.tif", bin_histograms, 
+  ggsave("./Outputs/Figures/Kfold_selected_bins_histogram_for_manuscript_updated121624.tif", bin_histograms, 
          units = "in", height = 8, width = 16, dpi = 600, device = 'tiff', compression = 'lzw')
   
   
@@ -542,8 +542,8 @@
   SpRankCor_mean <- rbind(mean_den_SpRankCor, mean_rnd_SpRankCor) %>% relocate(Site_type, .before = "mean_rho")
   
   #'  Save
-  write_csv(SpRankCor_Kfold, file = "Outputs/Tables/Spearman_Rank_Corr_Kfold.csv")
-  write_csv(SpRankCor_mean, file = "Outputs/Tables/Spearman_Rank_Corr_mean.csv")
+  write_csv(SpRankCor_Kfold, file = "Outputs/Tables/Spearman_Rank_Corr_Kfold_updated121624.csv")
+  write_csv(SpRankCor_mean, file = "Outputs/Tables/Spearman_Rank_Corr_mean_updated121624.csv")
   
   #'  Try Dave's regression approach too
   #'  extract bins for used locations in each training data set and regress against 
