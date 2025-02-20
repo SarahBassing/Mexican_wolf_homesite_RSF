@@ -741,10 +741,17 @@
   canopy_cov <- canopy[[2]]
   canopy_cov[is.na(canopy_cov[])] <- 0
   ndvi <- rast("./Shapefiles/Vegetation_variables/Resampled_meanNDVI_rnd_movingwindow.tif")
+  water_5km <- rast("./Shapefiles/National Hydrography Dataset (NHD)/Dist2Water_5km_res_NAD83.tif")
+  curve_5km <- rast("./Shapefiles/Terrain_variables/Gaussian_curvature_5km_res_NAD83.tif")
+  roads_5km <- rast("./Shapefiles/Human_variables/dist_to_road_5km_res_NAD83.tif")
+  human_mod_5km <- rast("./Shapefiles/Human_variables/global_Human_Modification_5km_res_NAD83.tif")
   
   #'  Visualize
   plot(elev)
   plot(az_nm[1], color = NA, add = T); plot(mwz3, add = T); plot(mwz2, add = T); plot(mwz1, add = T); plot(buff[1], add = T)
+  plot(curve_5km)
+  plot(az_nm[1], color = NA, add = T); plot(mwz3, add = T); plot(mwz2, add = T); plot(mwz1, add = T); plot(buff[1], add = T)
+  
   
   #'  Crop covariates and plot
   crop_covs <- function(cov, shp, mycolors, covname) {
@@ -781,6 +788,11 @@
   crop_canopy <- crop_covs(canopy_cov, shp = buff, covname = "2022 Percent \ncanopy cover", mycolors = paletteer_c("grDevices::Greens", 30, direction = -1))
   crop_ndvi <- crop_covs(ndvi, shp = buff, covname = "2022 Mean \nNDVI", mycolors = paletteer_c("ggthemes::Green-Gold", 30))
 
+  crop_curve_5km <- crop_covs(curve_5km, shp = buff, covname = "Surface \ncurvature", mycolors = c("#26456E", "#2B5C8A", "#508BB8", "#96B7D1", "#F4F9FC", "#FFC382", "#F18932", "#CA5621", "#9E3D22", "#7B3014")) #c("darkblue", "blue", "lightblue", "red", "firebrick", "darkred")
+  crop_water_5km <- crop_covs(water_5km, shp = buff, covname = "Nearest \nwater (m)", mycolors = paletteer_c("ggthemes::Classic Blue", 30))
+  crop_human_5km <- crop_covs(human_mod_5km, shp = buff, covname = "Human \nmodification \nindex", mycolors = paletteer_c("ggthemes::Orange-Blue Diverging", 30))
+  crop_roads_5km <- crop_covs(roads_5km, shp = buff, covname = "Nearest \nroad (m)", mycolors = paletteer_c("ggthemes::Classic Area-Brown", 30))
+  
   #'  Customize individual plots and patchwork together
   elev_den <- elev_den + ggtitle("Sampled locations")
   elev_rnd <- elev_rnd + ggtitle("Sampled locations")
@@ -788,8 +800,8 @@
   crop_elev <- crop_elev + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
   crop_slope <- crop_slope + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
   crop_rough <- crop_rough + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
-  crop_human <- crop_human + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
-  crop_road <- crop_roads + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
+  crop_human_5km <- crop_human_5km + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
+  crop_roads_5km <- crop_roads_5km + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
   # crop_canopy <- crop_canopy + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
   crop_ndvi <- crop_ndvi + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
   
@@ -813,7 +825,7 @@
   
   #'  Additional significant covariates from top den RSF
   top_den_covs_b <- (crop_rough + rough_den) / 
-    (crop_road + road_den) & 
+    (crop_roads + road_den) & 
     theme(text = element_text(size = 6),
           #'  Make legend smaller
           legend.key.size = unit(0.5, "lines"),
@@ -827,7 +839,7 @@
          height = 7, width = 11, dpi = 600, device = 'tiff', compression = 'lzw')
   
   #'  Non-significant covariates from top den RSF
-  top_den_covs_nonsig <- (crop_human + human_den) / 
+  top_den_covs_nonsig <- (crop_human_5km + human_den) / 
     (crop_canopy + canopy_den) & 
     theme(text = element_text(size = 6),
           #'  Make legend smaller
@@ -838,7 +850,7 @@
   top_den_covs_nonsig[[2]] <- top_den_covs_nonsig[[2]] + plot_layout(tag_level = 'new')
   top_den_covs_nonsig <- top_den_covs_nonsig + plot_annotation(tag_levels = c('a', '1'))
   
-  ggsave("./Outputs/Figures/Den_top_mod_nonsignif_covs.tiff", top_den_covs_nonsig, units = "cm", 
+  ggsave("./Outputs/Figures/Den_top_mod_nonsignif_covs_human_5km.tiff", top_den_covs_nonsig, units = "cm", 
          height = 7, width = 11, dpi = 600, device = 'tiff', compression = 'lzw')
   
   
@@ -861,7 +873,7 @@
   
   #'  Selection of nonsignificant covariates from top rendezvous site RSF
   top_rnd_covs_nonsig <- (crop_rough + rough_rnd) / 
-    (crop_curve + curve_rnd) &
+    (crop_curve_5km + curve_rnd) &
     theme(text = element_text(size = 6),
           #'  Make legend smaller
           legend.key.size = unit(0.5, "lines"),
@@ -871,7 +883,7 @@
   top_rnd_covs_nonsig[[2]] <- top_rnd_covs_nonsig[[2]] + plot_layout(tag_level = 'new')
   top_rnd_covs_nonsig <- top_rnd_covs_nonsig + plot_annotation(tag_levels = c('a', '1'))
   
-  ggsave("./Outputs/Figures/Rendezvous_top_mod_nonsignif_covs.tiff", top_rnd_covs_nonsig, units = "cm", 
+  ggsave("./Outputs/Figures/Rendezvous_top_mod_nonsignif_covs_curve_5km.tiff", top_rnd_covs_nonsig, units = "cm", 
          height = 8, width = 12, dpi = 600, device = 'tiff', compression = 'lzw')
   
   
