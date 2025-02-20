@@ -160,6 +160,44 @@
   # writeRaster(human_mod_resampled, "./Shapefiles/Human_variables/mosaic_global_Human_Modification_resampled.tif")
   # writeRaster(roads_resampled, "./Shapefiles/Human_variables/mosaic_dist2road_resampled.tif")
   
+  #'  -------------------------------------------------
+  ####  Resample to larger resolution for publication  ####
+  #'  -------------------------------------------------
+  #'  Reviewer suggests plotting at 5 km (5000 m) resolution
+  #'  Use MWEPA projection (resampling needs to be in projected coordinate system with m)
+  mwepa <- st_read("./Shapefiles/MWEPA Layers Zone 1-3 & Boundary/MWEPA Final.shp"); crs(mwepa)
+  
+  #'  Function to transform and resample raster to new resolution
+  resample_to_larger_res <- function(r, new_res) {
+    #'  Reproject raster
+    r_reproj <- project(r, crs(mwepa))
+    print(st_crs(r_reproj))
+    
+    #'  Define new pixel resolution and resample
+    r_new_res <- r_reproj
+    res(r_new_res) <- new_res
+    r_new_res <- resample(r_reproj, r_new_res)
+    
+    #'  Plot original and resampled rasters
+    plot(r_reproj, main = "original raster")
+    plot(r_new_res, main = "resampled raster with larger resolution")
+    
+    #'  Project back to geographic coordinate system
+    r_new_res_nad83 <- project(r_new_res, crs(dem))
+    return(r_new_res_nad83)
+  }
+  water_5km <- resample_to_larger_res(water, new_res = 5000)
+  roads_5km <- resample_to_larger_res(roads, new_res = 5000)
+  human_mod_5km <- resample_to_larger_res(human_mod, new_res = 5000)
+  curve_5km <- resample_to_larger_res(curve, new_res = 5000)
+  
+  writeRaster(water_5km, "./Shapefiles/National Hydrography Dataset (NHD)/Dist2Water_5km_res_NAD83.tif", overwrite = TRUE)
+  writeRaster(roads_5km, "./Shapefiles/Human_variables/dist_to_road_5km_res_NAD83.tif", overwrite = TRUE)
+  writeRaster(human_mod_5km, "./Shapefiles/Human_variables/global_Human_Modification_5km_res_NAD83.tif", overwrite = TRUE)
+  writeRaster(curve_5km, "./Shapefiles/Terrain_variables/Gaussian_curvature_5km_res_NAD83.tif", overwrite = TRUE)
+  
+  
+  
   #'  -------------------------------------
   ####  Exported Google Earth Engine data  ####
   #'  -------------------------------------
