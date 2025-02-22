@@ -690,7 +690,7 @@
                              legend_title = "Rendezvous site", xtitle = "Terrain roughness (VRM)")
   curve_den <- density_plots(all_data_den, cov = all_data_den$Gaussian_curvature, col_id = 5, x1 = -0.0002, x2 = 0.00005, y1 = 150000, y2 = 20000, 
                              legend_title = "Den", xtitle = "Surface curvature")
-  curve_rnd <- density_plots(all_data_rnd, cov = all_data_rnd$Gaussian_curvature, col_id = 5, x1 = -0.00045, x2 = 0.00005, y1 = 150000, y2 = 60000, 
+  curve_rnd <- density_plots(all_data_rnd, cov = all_data_rnd$Gaussian_curvature, col_id = 5, x1 = -0.00045, x2 = -0.00045, y1 = 150000, y2 = 100000, 
                              legend_title = "Rendezvous site", xtitle = "Surface curvature")
   water_den <- density_plots(all_data_den, cov = all_data_den$Nearest_water_m, col_id = 6, x1 = 1500, x2 = 1500, y1 = 0.00045, y2 = 0.00052, 
                              legend_title = "Den", xtitle = "Distance to nearest water (m)")
@@ -801,15 +801,17 @@
   crop_slope <- crop_slope + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
   crop_rough <- crop_rough + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
   crop_human_5km <- crop_human_5km + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
-  crop_roads_5km <- crop_roads_5km + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
+  crop_water <- crop_water + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
   # crop_canopy <- crop_canopy + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
   crop_ndvi <- crop_ndvi + theme(axis.text.x = element_blank(), axis.title.x = element_blank()) #axis.ticks.x = element_blank(), 
   
   ######  Patchwork covariate maps & use/available data  ######
-  #'  Selection of significant covariates from top den RSF
+  #'  Significant covaraites from top den RSF
   top_den_covs <- (crop_elev + elev_den) / #+ plot_layout(width = c(1.5, 1)) 
     (crop_slope + slope_den) / 
-    (crop_water + water_den) & 
+    (crop_water + water_den) /
+    (crop_rough + rough_den) / 
+    (crop_roads + road_den) & 
     theme(text = element_text(size = 6),
           #'  Make legend smaller
           legend.key.size = unit(0.5, "lines"),
@@ -818,25 +820,12 @@
   top_den_covs[[1]] <- top_den_covs[[1]] + plot_layout(tag_level = 'new')
   top_den_covs[[2]] <- top_den_covs[[2]] + plot_layout(tag_level = 'new')
   top_den_covs[[3]] <- top_den_covs[[3]] + plot_layout(tag_level = 'new')
+  top_den_covs[[4]] <- top_den_covs[[4]] + plot_layout(tag_level = 'new')
+  top_den_covs[[5]] <- top_den_covs[[5]] + plot_layout(tag_level = 'new')
   top_den_covs <- top_den_covs + plot_annotation(tag_levels = c('a', '1'))
   
-  ggsave("./Outputs/Figures/Den_top_mod_signif_covs.tiff", top_den_covs, units = "cm", 
-         height = 12, width = 12, dpi = 600, device = 'tiff', compression = 'lzw')
-  
-  #'  Additional significant covariates from top den RSF
-  top_den_covs_b <- (crop_rough + rough_den) / 
-    (crop_roads + road_den) & 
-    theme(text = element_text(size = 6),
-          #'  Make legend smaller
-          legend.key.size = unit(0.5, "lines"),
-          legend.justification = c(1, 0))
-  #'  Annotate figure 
-  top_den_covs_b[[1]] <- top_den_covs_b[[1]] + plot_layout(tag_level = 'new')
-  top_den_covs_b[[2]] <- top_den_covs_b[[2]] + plot_layout(tag_level = 'new')
-  top_den_covs_b <- top_den_covs_b + plot_annotation(tag_levels = c('a', '1'))
-  
-  ggsave("./Outputs/Figures/Den_top_mod_signif_covs_secondset.tiff", top_den_covs_b, units = "cm", 
-         height = 7, width = 11, dpi = 600, device = 'tiff', compression = 'lzw')
+  ggsave("./Outputs/Figures/Den_top_mod_signif_covs_all.tiff", top_den_covs, units = "cm", 
+         height = 18, width = 11, dpi = 600, device = 'tiff', compression = 'lzw')
   
   #'  Non-significant covariates from top den RSF
   top_den_covs_nonsig <- (crop_human_5km + human_den) / 
@@ -851,13 +840,14 @@
   top_den_covs_nonsig <- top_den_covs_nonsig + plot_annotation(tag_levels = c('a', '1'))
   
   ggsave("./Outputs/Figures/Den_top_mod_nonsignif_covs_human_5km.tiff", top_den_covs_nonsig, units = "cm", 
-         height = 7, width = 11, dpi = 600, device = 'tiff', compression = 'lzw')
+         height = 7, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
   
-  
-  #'  Selection of significant covariates from top rendezvous site RSF
+  #'  All covariates from top rendezvous site RSF
   top_rnd_covs <- (crop_elev + elev_rnd) / 
     (crop_ndvi + ndvi_rnd) /
-    (crop_water + water_rnd) &
+    (crop_water + water_rnd) /
+    (crop_rough + rough_rnd) / 
+    (crop_curve_5km + curve_rnd) &
     theme(text = element_text(size = 6),
           #'  Make legend smaller
           legend.key.size = unit(0.5, "lines"),
@@ -866,25 +856,76 @@
   top_rnd_covs[[1]] <- top_rnd_covs[[1]] + plot_layout(tag_level = 'new')
   top_rnd_covs[[2]] <- top_rnd_covs[[2]] + plot_layout(tag_level = 'new')
   top_rnd_covs[[3]] <- top_rnd_covs[[3]] + plot_layout(tag_level = 'new')
+  top_rnd_covs[[4]] <- top_rnd_covs[[4]] + plot_layout(tag_level = 'new')
+  top_rnd_covs[[5]] <- top_rnd_covs[[5]] + plot_layout(tag_level = 'new')
   top_rnd_covs <- top_rnd_covs + plot_annotation(tag_levels = c('a', '1'))
   
-  ggsave("./Outputs/Figures/Rendezvous_top_mod_signif_covs.tiff", top_rnd_covs, units = "cm", 
-         height = 12, width = 12, dpi = 600, device = 'tiff', compression = 'lzw')
+  ggsave("./Outputs/Figures/Rendezvous_top_mod_covs_final.tiff", top_rnd_covs, units = "cm", 
+         height = 18, width = 11, dpi = 600, device = 'tiff', compression = 'lzw')
   
-  #'  Selection of nonsignificant covariates from top rendezvous site RSF
-  top_rnd_covs_nonsig <- (crop_rough + rough_rnd) / 
-    (crop_curve_5km + curve_rnd) &
-    theme(text = element_text(size = 6),
-          #'  Make legend smaller
-          legend.key.size = unit(0.5, "lines"),
-          legend.justification = c(1, 0))
-  #'  Annotate figure 
-  top_rnd_covs_nonsig[[1]] <- top_rnd_covs_nonsig[[1]] + plot_layout(tag_level = 'new')
-  top_rnd_covs_nonsig[[2]] <- top_rnd_covs_nonsig[[2]] + plot_layout(tag_level = 'new')
-  top_rnd_covs_nonsig <- top_rnd_covs_nonsig + plot_annotation(tag_levels = c('a', '1'))
-  
-  ggsave("./Outputs/Figures/Rendezvous_top_mod_nonsignif_covs_curve_5km.tiff", top_rnd_covs_nonsig, units = "cm", 
-         height = 8, width = 12, dpi = 600, device = 'tiff', compression = 'lzw')
+  #' #'  Selection of significant covariates from top den RSF
+  #' top_den_covs <- (crop_elev + elev_den) / #+ plot_layout(width = c(1.5, 1))
+  #'   (crop_slope + slope_den) /
+  #'   (crop_water + water_den) &
+  #'   theme(text = element_text(size = 6),
+  #'         #'  Make legend smaller
+  #'         legend.key.size = unit(0.5, "lines"),
+  #'         legend.justification = c(1, 0))
+  #' #'  Annotate figure
+  #' top_den_covs[[1]] <- top_den_covs[[1]] + plot_layout(tag_level = 'new')
+  #' top_den_covs[[2]] <- top_den_covs[[2]] + plot_layout(tag_level = 'new')
+  #' top_den_covs[[3]] <- top_den_covs[[3]] + plot_layout(tag_level = 'new')
+  #' top_den_covs <- top_den_covs + plot_annotation(tag_levels = c('a', '1'))
+  #' 
+  #' ggsave("./Outputs/Figures/Den_top_mod_signif_covs.tiff", top_den_covs, units = "cm",
+  #'        height = 12, width = 12, dpi = 600, device = 'tiff', compression = 'lzw')
+  #' 
+  #' #'  Additional significant covariates from top den RSF
+  #' top_den_covs_b <- (crop_rough + rough_den) /
+  #'   (crop_roads + road_den) &
+  #'   theme(text = element_text(size = 6),
+  #'         #'  Make legend smaller
+  #'         legend.key.size = unit(0.5, "lines"),
+  #'         legend.justification = c(1, 0))
+  #' #'  Annotate figure
+  #' top_den_covs_b[[1]] <- top_den_covs_b[[1]] + plot_layout(tag_level = 'new')
+  #' top_den_covs_b[[2]] <- top_den_covs_b[[2]] + plot_layout(tag_level = 'new')
+  #' top_den_covs_b <- top_den_covs_b + plot_annotation(tag_levels = c('a', '1'))
+  #' 
+  #' ggsave("./Outputs/Figures/Den_top_mod_signif_covs_secondset.tiff", top_den_covs_b, units = "cm",
+  #'        height = 7, width = 11, dpi = 600, device = 'tiff', compression = 'lzw')
+  #' 
+  #' #'  Selection of significant covariates from top rendezvous site RSF
+  #' top_rnd_covs <- (crop_elev + elev_rnd) / 
+  #'   (crop_ndvi + ndvi_rnd) /
+  #'   (crop_water + water_rnd) &
+  #'   theme(text = element_text(size = 6),
+  #'         #'  Make legend smaller
+  #'         legend.key.size = unit(0.5, "lines"),
+  #'         legend.justification = c(1, 0))
+  #' #'  Annotate figure 
+  #' top_rnd_covs[[1]] <- top_rnd_covs[[1]] + plot_layout(tag_level = 'new')
+  #' top_rnd_covs[[2]] <- top_rnd_covs[[2]] + plot_layout(tag_level = 'new')
+  #' top_rnd_covs[[3]] <- top_rnd_covs[[3]] + plot_layout(tag_level = 'new')
+  #' top_rnd_covs <- top_rnd_covs + plot_annotation(tag_levels = c('a', '1'))
+  #' 
+  #' ggsave("./Outputs/Figures/Rendezvous_top_mod_signif_covs.tiff", top_rnd_covs, units = "cm", 
+  #'        height = 12, width = 12, dpi = 600, device = 'tiff', compression = 'lzw')
+  #' 
+  #' #'  Selection of nonsignificant covariates from top rendezvous site RSF
+  #' top_rnd_covs_nonsig <- (crop_rough + rough_rnd) / 
+  #'   (crop_curve_5km + curve_rnd) &
+  #'   theme(text = element_text(size = 6),
+  #'         #'  Make legend smaller
+  #'         legend.key.size = unit(0.5, "lines"),
+  #'         legend.justification = c(1, 0))
+  #' #'  Annotate figure 
+  #' top_rnd_covs_nonsig[[1]] <- top_rnd_covs_nonsig[[1]] + plot_layout(tag_level = 'new')
+  #' top_rnd_covs_nonsig[[2]] <- top_rnd_covs_nonsig[[2]] + plot_layout(tag_level = 'new')
+  #' top_rnd_covs_nonsig <- top_rnd_covs_nonsig + plot_annotation(tag_levels = c('a', '1'))
+  #' 
+  #' ggsave("./Outputs/Figures/Rendezvous_top_mod_nonsignif_covs_curve_5km.tiff", top_rnd_covs_nonsig, units = "cm", 
+  #'        height = 8, width = 12, dpi = 600, device = 'tiff', compression = 'lzw')
   
   
   #'  -----------------------------------------
