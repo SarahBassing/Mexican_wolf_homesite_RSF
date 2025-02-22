@@ -234,8 +234,8 @@
   #'  Coefficient results table
   topmod_coefs <- bind_rows(topmod_den_coefs, topmod_rnd_coefs)
   
-  #'  Write file for publication
-  write_csv(topmod_coefs, file = "./Outputs/Tables/Top_Model_Coefficients_updated_121624.csv")
+  #' #'  Write file for publication
+  #' write_csv(topmod_coefs, file = "./Outputs/Tables/Top_Model_Coefficients_updated_121624.csv")
   
   #####  AIC model ranks  #####
   #'  Generate modelselection objects
@@ -280,8 +280,120 @@
   #'  Combine into single AIC model ranking table
   AIC_table <- bind_rows(AIC_table_den, AIC_table_rnd)
   
-  #'  Write table for publication
-  write_csv(AIC_table, file = "./Outputs/Tables/AICc_Model_Rank_Table_updated_121624.csv")
+  #' #'  Write table for publication
+  #' write_csv(AIC_table, file = "./Outputs/Tables/AICc_Model_Rank_Table_updated_121624.csv")
+  
+  #'  -------------------------------------------------------
+  ####  Log odds interpretation of significant coefficients  ####
+  #'  -------------------------------------------------------
+  #'  Calculate 95% CI & log odds for each coefficient 
+  logodds_signif_coef <- function(mod) {
+    #'  Create dataframe of coefficients and 95% confidence intervals
+    beta <- summary(mod)$coefficients[,1]
+    se <- summary(mod)$coefficients[,2]
+    lci <- beta - 1.96*se
+    uci <- beta + 1.96*se
+    signif_coefs <- as.data.frame(beta) %>%
+      mutate(Parameter = row.names(.)) %>%
+      bind_cols(lci, uci) %>%
+      relocate(Parameter, .before = beta) %>%
+      filter(Parameter != "(Intercept)") 
+    rownames(signif_coefs) <- NULL
+    colnames(signif_coefs) <- c("Parameter", "beta", "lci", "uci")
+    
+    #'  Calculate log odds for each coefficient and 95% CIs
+    log_odds_coef <- signif_coefs %>%
+      mutate(beta_logodd = exp(beta),
+             lci_logodd = exp(lci),
+             uci_logodd = exp(uci))
+    return(log_odds_coef)
+  }
+  den_signif_logodds <- logodds_signif_coef(h4.den.v4)
+  rnd_signif_logodds <- logodds_signif_coef(h2.rnd.v3)
+  
+  #'  Calculate standard deviation for each covariate on natural scale 
+  #'  (i.e., what does 1 SD change in a covariate represent?)
+  covariate_sd <- function(dat) {
+    skinny_dat <- dat %>%
+      dplyr::select(-c(ID, Pack_year, Homesite, used, wgts, geometry))
+    cov_sd <- apply(skinny_dat, 2, sd)
+    cov_sd <- as.data.frame(cov_sd) %>%
+      mutate(Parameter = row.names(.)) %>%
+      relocate(Parameter, .before = cov_sd)
+    rownames(cov_sd) <- NULL
+    return(cov_sd)
+  }
+  den_cov_sd <- covariate_sd(all_data_den)
+  rnd_cov_sd <- covariate_sd(all_data_rnd)
+  
+  
+  #### These doesn't work b/c can't predict without the intercept...
+  #' #'  Predict and plot relative selection for individual covariates while holding others at their mean
+  #' predict_covariate_effects <- function(cov, cov2, ncols, indx, indx2, covnames, ogcov, mod) {
+  #'   range_cov <- as.data.frame(seq(min(cov), max(cov), length.out = 500))
+  #'   range_cov2 <- as.data.frame(seq(min(cov2), max(cov2), length.out = 500))
+  #'   range_covz <- (range_cov - mean(cov))/sd(cov)
+  #'   range_cov2z <- (range_cov2 - mean(cov2))/sd(cov2)
+  #'   newcovs <- data.frame(matrix(ncol = ncols, nrow = 500))
+  #'   newcovs[1:500,] <- 0
+  #'   newcovs[,indx] <- range_covz
+  #'   newcovs[,indx2] <- range_cov2z
+  #'   colnames(newcovs) <- covnames
+  #'   colnames(range_cov) <- ogcov
+  #'   
+  #'   predict_selection <- predict(mod, newdata = newcovs, type = "response", se.fit = TRUE)
+  #'   full_dat <- bind_cols(range_cov, newcovs) 
+  #'   full_dat$selection <- predict_selection$fit
+  #'   full_dat$se <- predict_selection$se
+  #'   full_dat$lci <- full_dat$selection - 1.96*full_dat$se
+  #'   full_dat$uci <- full_dat$selection + 1.96*full_dat$se
+  #'   
+  #'   plot(full_dat$selection ~ full_dat[,1], main = "Relative selection over range of availability", 
+  #'        xlab = ogcov, ylab = "Predicted relative selection")
+  #'   
+  #'   return(full_dat)
+  #' }
+  #' elev_den_selection <- predict_covariate_effects(all_data_den$Elevation_m, cov2 = 0, ncols = 8, indx = 1, indx2 = NULL, mod = h4.den.v4, ogcov = "Elevation", covnames = c("Elev", "Slope", "Rough", "Dist2Water", "CanopyCov", "HumanMod", "Dist2Road", "AvgCanopyCov"))
+  #' slope_den_selection <- predict_covariate_effects(all_data_den$Slope_degrees, cov2 = 0, ncols = 8, indx = 2, indx2 = NULL, mod = h4.den.v4, ogcov = "Slope_degrees", covnames = c("Elev", "Slope", "Rough", "Dist2Water", "CanopyCov", "HumanMod", "Dist2Road", "AvgCanopyCov"))
+  #' rough_den_selection <- predict_covariate_effects(all_data_den$Roughness_VRM, cov2 = 0, ncols = 8, indx = 3, indx2 = NULL, mod = h4.den.v4, ogcov = "Roughness_VRM", covnames = c("Elev", "Slope", "Rough", "Dist2Water", "CanopyCov", "HumanMod", "Dist2Road", "AvgCanopyCov"))
+  #' water_den_selection <- predict_covariate_effects(all_data_den$Nearest_water_m, cov2 = 0, ncols = 8, indx = 4, indx2 = NULL, mod = h4.den.v4, ogcov = "Nearest_water_m", covnames = c("Elev", "Slope", "Rough", "Dist2Water", "CanopyCov", "HumanMod", "Dist2Road", "AvgCanopyCov"))
+  #' road_den_selection <- predict_covariate_effects(all_data_den$Nearest_road_m, cov2 = 0, ncols = 8, indx = 7, indx2 = NULL, mod = h4.den.v4, ogcov = "Nearest_road_m", covnames = c("Elev", "Slope", "Rough", "Dist2Water", "CanopyCov", "HumanMod", "Dist2Road", "AvgCanopyCov"))
+  #' 
+  #' elev_rnd_selection <- predict_covariate_effects(all_data_rnd$Elevation_m, cov2 = 0, ncols = 6, indx = 1, indx2 = NULL, mod = h2.rnd.v3, ogcov = "Elevation", covnames = c("Elev", "Rough", "Curve", "SeasonalNDVI", "Dist2Water", "AvgSeasonalNDVI"))
+  #' water_rnd_selection <- predict_covariate_effects(all_data_rnd$Nearest_water_m, cov2 = 0, ncols = 6, indx = 5, indx2 = NULL, mod = h2.rnd.v3, ogcov = "Nearest_water_m", covnames = c("Elev", "Rough", "Curve", "SeasonalNDVI", "Dist2Water", "AvgSeasonalNDVI"))
+  #' ndvi_lo_rnd_selection <- predict_covariate_effects(all_data_rnd$meanNDVI, cov2 = all_data_rnd$avg_MCP_meanNDVI, ncols = 6, indx = 4, indx2 = 6, mod = h2.rnd.v3, ogcov = "meanNDVI", covnames = c("Elev", "Rough", "Curve", "SeasonalNDVI", "Dist2Water", "AvgSeasonalNDVI"))
+  
+  #' #'  Predict NDVI functional response at low, medium, and high average NDVI
+  #' predict_functional_response <- function(cov, cov2, qtile, ncols, indx, indx2, covnames, ogcov, mod) {
+  #'   range_cov <- as.data.frame(seq(min(cov), max(cov), length.out = 500))
+  #'   range_cov2 <- as.data.frame(seq(min(cov2), max(cov2), length.out = 500))
+  #'   range_covz <- (range_cov - mean(cov))/sd(cov)
+  #'   range_cov2z <- (range_cov2 - mean(cov2))/sd(cov2)
+  #'   cov2_quantile <- quantile(range_cov2z[,1], qtile)
+  #'   newcovs <- data.frame(matrix(ncol = ncols, nrow = 500))
+  #'   newcovs[1:500,] <- 0
+  #'   newcovs[,indx] <- range_covz
+  #'   newcovs[,indx2] <- cov2_quantile
+  #'   colnames(newcovs) <- covnames
+  #'   colnames(range_cov) <- ogcov
+  #'   
+  #'   predict_selection <- predict(mod, newdata = newcovs, type = "response", se.fit = TRUE)
+  #'   full_dat <- bind_cols(range_cov, newcovs) 
+  #'   full_dat$selection <- predict_selection$fit
+  #'   full_dat$se <- predict_selection$se
+  #'   full_dat$lci <- full_dat$selection - 1.96*full_dat$se
+  #'   full_dat$uci <- full_dat$selection + 1.96*full_dat$se
+  #'   
+  #'   plot(full_dat$selection ~ full_dat[,1], main = "Relative selection over range of availability", 
+  #'        xlab = ogcov, ylab = "Predicted relative selection")
+  #'   
+  #'   return(full_dat)
+  #' }
+  #' ndvi_low_rnd_selection <- predict_functional_response(cov = all_data_rnd$meanNDVI, cov2 = all_data_rnd$avg_MCP_meanNDVI, qtile = 0.05, ncols = 6, indx = 4, indx2 = 5, mod = h2.rnd.v3, ogcov = "meanNDVI", covnames = c("Elev", "Rough", "Curve", "SeasonalNDVI", "AvgSeasonalNDVI", "Dist2Water"))
+  #' ndvi_med_rnd_selection <- predict_functional_response(cov = all_data_rnd$meanNDVI, cov2 = all_data_rnd$avg_MCP_meanNDVI, qtile = 0.50, ncols = 6, indx = 4, indx2 = 5, mod = h2.rnd.v3, ogcov = "meanNDVI", covnames = c("Elev", "Rough", "Curve", "SeasonalNDVI", "AvgSeasonalNDVI", "Dist2Water"))
+  #' ndvi_hi_rnd_selection <- predict_functional_response(cov = all_data_rnd$meanNDVI, cov2 = all_data_rnd$avg_MCP_meanNDVI, qtile = 0.95, ncols = 6, indx = 4, indx2 = 5, mod = h2.rnd.v3, ogcov = "meanNDVI", covnames = c("Elev", "Rough", "Curve", "SeasonalNDVI", "AvgSeasonalNDVI", "Dist2Water"))
+  #' 
+  
   
   #'  ---------------------
   ####  Visualize results  ####
@@ -385,11 +497,11 @@
     
     return(predict_rsf)
   }
-  #'  Predict relative probability of selection for den habitat across MWEPA for k training models 
+  #'  Predict relative probability of selection for den habitat across MWEPA  
   den_h4.predict <- predict_den_rsf(coefs_h4.den, cov = zcovs_den_mwepa)
   head(den_h4.predict); tail(den_h4.predict)
   
-  save(den_h4.predict, file = "./Outputs/den_h4.predict_elev2_updated_121624.RData")
+  # save(den_h4.predict, file = "./Outputs/den_h4.predict_elev2_updated_121624.RData")
   
   predict_rnd_rsf <- function(coef, cov) {
     predict_rsf <- c()
@@ -405,11 +517,11 @@
     
     return(predict_rsf)
   }
-  #'  Predict relative probability of selection for rendezvous habitat across MWEPA for k training models 
+  #'  Predict relative probability of selection for rendezvous habitat across MWEPA 
   rnd_h2.predict <- predict_rnd_rsf(coefs_h2.rnd, cov = zcovs_rnd_mwepa)
   head(rnd_h2.predict); tail(rnd_h2.predict)
   
-  save(rnd_h2.predict, file = "./Outputs/rnd_h2.predict_elev2_updated_121624.RData")
+  # save(rnd_h2.predict, file = "./Outputs/rnd_h2.predict_elev2_updated_121624.RData")
   
   ######  Map predicted habitat selection  ######
   #'  -------------------------------------
@@ -465,9 +577,9 @@
   den_predict_binned <- reclassify_RSF(den_h4.predict, covs = zcovs_den_mwepa)
   rnd_predict_binned <- reclassify_RSF(rnd_h2.predict, covs = zcovs_rnd_mwepa)
   
-  #'  Save binned classifications per fold
-  save(den_predict_binned, file = "./Outputs/den_predict_binned_elev2_updated121624.RData")
-  save(rnd_predict_binned, file = "./Outputs/rnd_predict_binned_elev2_updated121624.RData")
+  #' #'  Save binned classifications per fold
+  #' save(den_predict_binned, file = "./Outputs/den_predict_binned_elev2_updated121624.RData")
+  #' save(rnd_predict_binned, file = "./Outputs/rnd_predict_binned_elev2_updated121624.RData")
   
   #'  Grab the coordinate system
   ref_grid <- terra::rast("./Shapefiles/WMEPA_buffer_grid_clip.tif")
@@ -514,9 +626,9 @@
   bin_area
   print("Raster area"); sum(bin_area$area)
   
-  #'  Save rasterized binned RSFs
-  writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster_elev2_updated121624.tif", overwrite = TRUE)
-  writeRaster(rnd_predict_rast, filename = "./Shapefiles/Predicted RSFs/rnd_predict_raster_elev2_updated121624.tif", overwrite = TRUE)
+  #' #'  Save rasterized binned RSFs
+  #' writeRaster(den_predict_rast, filename = "./Shapefiles/Predicted RSFs/den_predict_raster_elev2_updated121624.tif", overwrite = TRUE)
+  #' writeRaster(rnd_predict_rast, filename = "./Shapefiles/Predicted RSFs/rnd_predict_raster_elev2_updated121624.tif", overwrite = TRUE)
 
   #'  Map predicted RSFs
   #'  Define color palette (only bins 7-10 really identifiable)
@@ -543,10 +655,10 @@
     theme(text = element_text(size = 18))
   rnd_rsf_plot
   
-  ggsave("./Outputs/Figures/RSF_binned_den_plot_updated121624.tiff", den_rsf_plot, units = "in", 
-         height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
-  ggsave("./Outputs/Figures/RSF_binned_rnd_plot_updated121624.tiff", rnd_rsf_plot, units = "in", 
-         height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
+  # ggsave("./Outputs/Figures/RSF_binned_den_plot_updated121624.tiff", den_rsf_plot, units = "in", 
+  #        height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
+  # ggsave("./Outputs/Figures/RSF_binned_rnd_plot_updated121624.tiff", rnd_rsf_plot, units = "in", 
+  #        height = 6, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
   
    
   #####  Non-linear response to elevation  #####
@@ -637,7 +749,6 @@
   #'  Helpful code: https://cran.r-project.org/web/packages/glm.predict/vignettes/glm.predict.html
   #'  Number of bootstraps
   nboot <- 100
-  
     
   #'  Function to bootstrap logistic regression 
   boot <- function(x, model){
@@ -675,7 +786,7 @@
   upperp <- c()
   for(i in 1:nboot){
     dat <- as.vector(newdat[i,])
-    yhat[,i] <- betas_boot %*% dat
+    yhat[,i] <- betas_boot_den %*% dat
     predProb[,i] <- exp(yhat[,i]) 
     muPredProb[i] <- mean(predProb[,i])
     lowerp[i] <- quantile(predProb[,i], probs = c(0.025))
@@ -691,7 +802,7 @@
   
   #'  For a very specific value (highest elevation a max relative prob. of selection)
   newdat2 <- c(0, 2.9789171, 8.87394683, 0, 0, 0, 0, 0, 0, 0)
-  yhat2 = betas_boot %*% newdat2
+  yhat2 = betas_boot_den %*% newdat2
   predProb2 = exp(yhat2) 
   mean(predProb2)
   quantile(predProb2, probs = c(0.025, 0.975))
@@ -711,14 +822,20 @@
   min_avg_MCP_meanNDVI <- min(all_data_rnd$avg_MCP_meanNDVI)
   mean_avg_MCP_meanNDVI <- mean(all_data_rnd$avg_MCP_meanNDVI)
   max_avg_MCP_meanNDVI <- max(all_data_rnd$avg_MCP_meanNDVI)
+  quant10_avg_MCP_meanNDVI <- quantile(all_data_rnd$avg_MCP_meanNDVI, 0.1)
+  quant90_avg_MCP_meanNDVI <- quantile(all_data_rnd$avg_MCP_meanNDVI, 0.9)
   #'  Center and scale
   min_avg_MCP_meanNDVIz <- (min_avg_MCP_meanNDVI - data_rnd_stats$avg_MCP_meanNDVI[1])/data_rnd_stats$avg_MCP_meanNDVI[2]
   mean_avg_MCP_meanNDVIz <- (mean_avg_MCP_meanNDVI - data_rnd_stats$avg_MCP_meanNDVI[1])/data_rnd_stats$avg_MCP_meanNDVI[2]
   max_avg_MCP_meanNDVIz <- (max_avg_MCP_meanNDVI - data_rnd_stats$avg_MCP_meanNDVI[1])/data_rnd_stats$avg_MCP_meanNDVI[2]
+  quant10_avg_MCP_meanNDVIz <- (quant10_avg_MCP_meanNDVI - data_rnd_stats$avg_MCP_meanNDVI[1])/data_rnd_stats$avg_MCP_meanNDVI[2]
+  quant90_avg_MCP_meanNDVIz <- (quant90_avg_MCP_meanNDVI - data_rnd_stats$avg_MCP_meanNDVI[1])/data_rnd_stats$avg_MCP_meanNDVI[2]
   #'  Create modified covariate (meanNDVI*avg_MCP_meanNDIV)
   min_ModifiedNDVIz <- range_meanNDVIz*min_avg_MCP_meanNDVIz
   mean_ModifiedNDVIz <- range_meanNDVIz*mean_avg_MCP_meanNDVIz
   max_ModifiedNDVIz <- range_meanNDVIz*max_avg_MCP_meanNDVIz
+  quant10_ModifiedNDVIz <- range_meanNDVIz*quant10_avg_MCP_meanNDVIz
+  quant90_ModifiedNDVIz <- range_meanNDVIz*quant90_avg_MCP_meanNDVIz
   
   #' #'  Create input data set for predictions
   #' func_rsp_df <- function(zcov, modNDVI) {
@@ -775,17 +892,17 @@
     names(AvailNDIV) <- c("meanNDVI", "meanNDVIz", "ModifiedNDVIz")
     return(AvailNDIV)
   }
-  func_rsp_AvailNDIV_low <- func_rsp_df(min_ModifiedNDVIz); head(func_rsp_AvailNDIV_low); tail(func_rsp_AvailNDIV_low)
+  func_rsp_AvailNDIV_low <- func_rsp_df(quant10_ModifiedNDVIz); head(func_rsp_AvailNDIV_low); tail(func_rsp_AvailNDIV_low)
   func_rsp_AvailNDIV_mid <- func_rsp_df(mean_ModifiedNDVIz); head(func_rsp_AvailNDIV_mid); tail(func_rsp_AvailNDIV_mid)
-  func_rsp_AvailNDIV_high <- func_rsp_df(max_ModifiedNDVIz); head(func_rsp_AvailNDIV_high); tail(func_rsp_AvailNDIV_high)
+  func_rsp_AvailNDIV_high <- func_rsp_df(quant90_ModifiedNDVIz); head(func_rsp_AvailNDIV_high); tail(func_rsp_AvailNDIV_high)
 
   #'  Predict across range of meanNDVI and different levels of average meanNDVI
   #'  across MCP during rnd season
   functional_response_rnd_rsf <- function(coef, cov) {
     #'  Predict across range of NDVI values while holding all other covs at their mean
     #'  (which is 0 since working with standardized covariates)
-    predict_rsf <- exp(coef$b.elev*0 + coef$b.rough*0 + coef$b.curve*0 + coef$b.water*0 +
-                         coef$b.ndvi*cov$meanNDVIz + coef$b.ndviXavgndvi*cov$ModifiedNDVIz)
+    predict_rsf <- exp(coef$b.elev*0 + coef$b.rough*0 + coef$b.curve*0 +
+                         coef$b.ndvi*cov$meanNDVIz + coef$b.ndviXavgndvi*cov$ModifiedNDVIz + coef$b.water*0)
     #'  Create a data frame with raw NDVI, standardized NDVI, and predicted RSF
     predict_rsf <- as.data.frame(predict_rsf)
     predict_rsf <- bind_cols(cov$meanNDVI, cov$meanNDVIz, cov$ModifiedNDVIz, predict_rsf)
@@ -823,6 +940,87 @@
          units = "in", height = 8, width = 10, dpi = 600, device = 'tiff', compression = 'lzw')
   
   
+  
+  #'  Number of bootstraps
+  nboot <- 500
+  
+  #'  Function to bootstrap logistic regression 
+  boot <- function(x, model){
+    #'  Grab input data from model
+    data <- model.frame(model)
+    #'  Generate new data set by resampling data using same sample size as original data with replacement
+    data_sample <- data[sample(seq_len(nrow(data)), replace = TRUE), ]
+    #'  Rename the weights column so it matches original input data
+    data_sample$wgts <- data_sample$`(weights)`
+    #'  Refit model with new data set
+    coef(update(model, data = data_sample))
+  }
+  
+  #'  Rendezvous site RSF
+  rsf.rnd <- glm(used ~ Elev + I(Elev^2) + Rough + Curve + SeasonalNDVI + 
+                   SeasonalNDVI:AvgSeasonalNDVI + Dist2Water, data = rnd_dataz, weight = wgts, family = binomial)
+  
+  #'  Call function nboot times and append bootstrapped coefficients into a single data frame
+  betas_boot_rnd <- do.call(rbind, lapply(1:nboot, boot, rsf.rnd)) 
+  #'  Drop intercept
+  betas_boot_rnd <- betas_boot_rnd[,-1]
+  
+  #'  Create new data for each covariate to predict across
+  #'  Note: holding all covs but ndvi & avg ndvi at their mean = 0 & setting intercept to 0 because only interested in linear predictors for RSF
+  x.intercept <- x.elev <- x.elev2 <- x.rough <- x.curve <- x.water <- rep(0, 500)
+  #'  Creating sequence of standardized elevation values based on min and max of standardized data
+  x.ndvi <- seq(min(all_data_rnd$meanNDVI), max(all_data_rnd$meanNDVI), length.out = 500)
+  #'  Grab low, medium, and high values for average MCP meanNDVI
+  x.avgndvi.q10 <- quantile(all_data_rnd$avg_MCP_meanNDVI, 0.1)
+  x.avgndvi.q50 <- quantile(all_data_rnd$avg_MCP_meanNDVI, 0.5)
+  x.avgndvi.q90 <- quantile(all_data_rnd$avg_MCP_meanNDVI, 0.9)
+  #'  Standardize NDVI and avg NDVI values
+  x.ndviz <- (x.ndvi - mean(all_data_rnd$meanNDVI))/sd(all_data_rnd$meanNDVI)
+  x.avgndvi.q10z <- (x.avgndvi.q10 - mean(all_data_rnd$avg_MCP_meanNDVI))/sd(all_data_rnd$avg_MCP_meanNDVI)
+  x.avgndvi.q50z <- (x.avgndvi.q50 - mean(all_data_rnd$avg_MCP_meanNDVI))/sd(all_data_rnd$avg_MCP_meanNDVI)
+  x.avgndvi.q90z <- (x.avgndvi.q90 - mean(all_data_rnd$avg_MCP_meanNDVI))/sd(all_data_rnd$avg_MCP_meanNDVI)
+  
+  #'  Create modified avg NDVI covariate (NDVI * avg NDVI)  
+  x.ndvi.avgndvi.q10z <- x.ndviz*x.avgndvi.q10z
+  x.ndviz.avgndvi.q50z <- x.ndviz*x.avgndvi.q50z
+  x.ndviz.avgndvi.q90z <- x.ndviz*x.avgndvi.q90z
+  
+  #'  Create new data frames with standardized NDVI & modified avgNDVI while holding others at their standardized mean (0)
+  newdat_avgNDVIq10 <- cbind(x.elev, x.elev2, x.rough, x.curve, x.ndviz, x.ndvi.avgndvi.q10z, x.water)
+  newdat_avgNDVIq50 <- cbind(x.elev, x.elev2, x.rough, x.curve, x.ndviz, x.ndviz.avgndvi.q50z, x.water)
+  newdat_avgNDVIq90 <- cbind(x.elev, x.elev2, x.rough, x.curve, x.ndviz, x.ndviz.avgndvi.q90z, x.water)
+  
+  bootstrap_CIs <- function(newdat) {
+    #'  Set up place holders for predictions
+    yhat <- matrix(ncol = nboot, nrow = nrow(newdat))
+    predProb <- matrix(ncol = nboot, nrow = nrow(newdat))
+    muPredProb <- c()
+    lowerp <- c()
+    upperp <- c()
+    #'  Predict y based on the bootstrapped coefficients and new data
+    for(i in 1:nboot){
+      dat <- as.vector(newdat[i,])
+      yhat[,i] <- betas_boot_rnd %*% dat
+      predProb[,i] <- exp(yhat[,i]) 
+      muPredProb[i] <- mean(predProb[,i])
+      lowerp[i] <- quantile(predProb[,i], probs = c(0.025))
+      upperp[i] <- quantile(predProb[,i], probs = c(0.975))
+    }
+    
+    #'  Merge predictions and raw NDVI covariate into a single data frame
+    predicted_rnd_rsf_ndvi <- cbind(x.ndvi, muPredProb, lowerp, upperp) %>% as.data.frame()
+    
+    #'  Plot prediction 
+    predicted_response <- ggplot(predicted_rnd_rsf_ndvi, aes(x = x.ndvi, y = muPredProb)) +
+      geom_line() +
+      geom_ribbon(aes(ymin = lowerp, ymax = upperp), alpha = 0.3) 
+    print(predicted_response)
+    
+    return(predicted_rnd_rsf_ndvi)
+  }
+  low <- bootstrap_CIs(newdat_avgNDVIq10)
+  med <- bootstrap_CIs(newdat_avgNDVIq50)
+  hi <- bootstrap_CIs(newdat_avgNDVIq90)
   
   
   
